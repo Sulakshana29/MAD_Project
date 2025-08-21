@@ -1,75 +1,246 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
+import ChatHistory from '@/components/ChatHistory';
+import ChatInterface from '@/components/ChatInterface';
+import QRGenerator from '@/components/QRGenerator';
+import QRScanner from '@/components/QRScanner';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { Colors } from '@/constants/Colors';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import DatabaseService from '@/services/DatabaseService';
+import MessagingService from '@/services/MessagingService';
+import React, { useEffect, useState } from 'react';
+import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
+
+type AppState = 'menu' | 'generate' | 'scan' | 'chat' | 'history';
 
 export default function HomeScreen() {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
+  
+  const [appState, setAppState] = useState<AppState>('menu');
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  useEffect(() => {
+    initializeApp();
+  }, []);
+
+  const initializeApp = async () => {
+    try {
+      // Initialize database
+      await DatabaseService.initialize();
+      
+      // Try to restore connection if exists
+      await MessagingService.restoreConnection();
+      
+      setIsInitialized(true);
+    } catch (error) {
+      console.error('Error initializing app:', error);
+      Alert.alert('Initialization Error', 'Failed to initialize the app. Please restart.');
+    }
+  };
+
+  const handleConnectionEstablished = (sessionId: string) => {
+    setCurrentSessionId(sessionId);
+    setAppState('chat');
+  };
+
+  const handleDisconnect = () => {
+    setCurrentSessionId(null);
+    setAppState('menu');
+  };
+
+  const handleSessionSelect = (sessionId: string) => {
+    setCurrentSessionId(sessionId);
+    setAppState('chat');
+  };
+
+  if (!isInitialized) {
+    return (
+      <ThemedView style={[styles.container, styles.center]}>
+        <ThemedText type="title">InstantChat</ThemedText>
+        <ThemedText>Initializing...</ThemedText>
+      </ThemedView>
+    );
+  }
+
+  const renderContent = () => {
+    switch (appState) {
+      case 'generate':
+        return (
+          <QRGenerator 
+            onConnectionEstablished={handleConnectionEstablished}
+          />
+        );
+      
+      case 'scan':
+        return (
+          <QRScanner 
+            onConnectionEstablished={handleConnectionEstablished}
+          />
+        );
+      
+      case 'chat':
+        return currentSessionId ? (
+          <ChatInterface 
+            sessionId={currentSessionId}
+            onDisconnect={handleDisconnect}
+          />
+        ) : null;
+      
+      case 'history':
+        return (
+          <ChatHistory 
+            onSessionSelect={handleSessionSelect}
+          />
+        );
+      
+      default:
+        return (
+          <View style={[styles.container, { backgroundColor: colors.background }]}>
+            <ThemedView style={styles.header}>
+              <ThemedText type="title" style={[styles.title, { color: colors.primary }]}>
+                InstantChat
+              </ThemedText>
+              <ThemedText style={[styles.subtitle, { color: colors.text }]}>
+                Connect instantly with QR codes
+              </ThemedText>
+            </ThemedView>
+
+            <View style={styles.menuContainer}>
+              <MenuButton
+                title="Generate QR Code"
+                subtitle="Create a QR code for others to scan"
+                icon="qrcode"
+                onPress={() => setAppState('generate')}
+                colors={colors}
+              />
+
+              <MenuButton
+                title="Scan QR Code"
+                subtitle="Scan someone's QR code to connect"
+                icon="camera"
+                onPress={() => setAppState('scan')}
+                colors={colors}
+              />
+
+              <MenuButton
+                title="Chat History"
+                subtitle="View your previous conversations"
+                icon="clock"
+                onPress={() => setAppState('history')}
+                colors={colors}
+              />
+            </View>
+          </View>
+        );
+    }
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {appState !== 'menu' && (
+        <View style={[styles.backButton, { borderBottomColor: colors.text + '20' }]}>
+          <TouchableOpacity onPress={() => setAppState('menu')}>
+            <ThemedText 
+              style={[styles.backText, { color: colors.tint }]}
+            >
+              ← Back to Menu
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
+      )}
+      {renderContent()}
+    </View>
   );
 }
 
+interface MenuButtonProps {
+  title: string;
+  subtitle: string;
+  icon: string;
+  onPress: () => void;
+  colors: any;
+}
+
+const MenuButton: React.FC<MenuButtonProps> = ({ title, subtitle, onPress, colors }) => (
+  <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+    <ThemedView 
+      style={[
+        styles.menuButton, 
+        { 
+          backgroundColor: colors.cardBackground || colors.background,
+          borderColor: colors.borderColor || colors.primary,
+          shadowColor: colors.primary,
+        }
+      ]}
+    >
+      <ThemedText type="subtitle" style={[styles.buttonTitle, { color: colors.primary }]}>
+        {title}
+      </ThemedText>
+      <ThemedText style={[styles.buttonSubtitle, { color: colors.placeholderText || colors.text }]}>
+        {subtitle}
+      </ThemedText>
+    </ThemedView>
+  </TouchableOpacity>
+);
+
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
+  container: {
+    flex: 1,
+  },
+  center: {
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  header: {
+    padding: 30,
+    alignItems: 'center',
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  subtitle: {
+    fontSize: 18,
+    textAlign: 'center',
+    opacity: 0.8,
+  },
+  menuContainer: {
+    flex: 1,
+    padding: 20,
+    gap: 20,
+  },
+  menuButton: {
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 2,
+    shadowColor: '#007AFF',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+    marginVertical: 8,
+  },
+  buttonTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 5,
+  },
+  buttonSubtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  backButton: {
+    padding: 16,
+    borderBottomWidth: 1,
+  },
+  backText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
