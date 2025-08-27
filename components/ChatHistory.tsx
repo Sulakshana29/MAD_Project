@@ -4,14 +4,14 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import DatabaseService, { ChatSession } from '@/services/DatabaseService';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 interface ChatHistoryProps {
@@ -92,6 +92,7 @@ export default function ChatHistory({ onSessionSelect }: ChatHistoryProps) {
     <TouchableOpacity
       style={[styles.sessionItem, { borderBottomColor: colors.borderColor }]}
       onPress={() => onSessionSelect(item.sessionId)}
+      onLongPress={() => deleteSession(item.sessionId, item.participantName)}
     >
       <View style={styles.sessionInfo}>
         <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
@@ -138,9 +139,40 @@ export default function ChatHistory({ onSessionSelect }: ChatHistoryProps) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.title, { color: colors.text }]}>
-        Chat History
-      </Text>
+      <View style={styles.headerRow}>
+        <Text style={[styles.title, { color: colors.text }]}>Chat History</Text>
+        <TouchableOpacity
+          onPress={async () => {
+            if (sessions.length === 0) return;
+            Alert.alert(
+              'Clear All Chats',
+              'This will permanently delete all chat sessions and messages on this device.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete All',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      for (const s of sessions) {
+                        await DatabaseService.deleteChatSession(s.sessionId);
+                      }
+                      setSessions([]);
+                    } catch (error) {
+                      console.error('Error clearing all sessions:', error);
+                      Alert.alert('Error', 'Failed to clear chat history');
+                    }
+                  },
+                },
+              ]
+            );
+          }}
+          disabled={sessions.length === 0}
+          style={[styles.clearAllButton, { opacity: sessions.length === 0 ? 0.4 : 1 }]}
+        >
+          <Text style={[styles.clearAllText, { color: colors.tint }]}>Clear All</Text>
+        </TouchableOpacity>
+      </View>
       
       <FlatList
         data={sessions}
@@ -193,6 +225,19 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     padding: 20,
     paddingBottom: 10,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  clearAllButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  clearAllText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   sessionsList: {
     flex: 1,

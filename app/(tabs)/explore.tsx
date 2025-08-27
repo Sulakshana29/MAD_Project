@@ -1,22 +1,19 @@
 import { StyleSheet } from 'react-native';
 
+import AppLogo from '@/components/AppLogo';
 import { Collapsible } from '@/components/Collapsible';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { IconSymbol } from '@/components/ui/IconSymbol';
 
 export default function AboutScreen() {
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
       headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="info.circle"
-          style={styles.headerImage}
-        />
+        <ThemedView style={styles.headerContainer}>
+          <AppLogo size="large" showText={false} />
+        </ThemedView>
       }>
       <ThemedView style={styles.titleContainer}>
         <ThemedText type="title">About InstantChat</ThemedText>
@@ -98,23 +95,18 @@ export default function AboutScreen() {
         <ThemedText style={styles.versionText}>
           <ThemedText type="defaultSemiBold">Built for:</ThemedText> Academic Project
         </ThemedText>
-        <ThemedText style={styles.versionText}>
-          <ThemedText type="defaultSemiBold">Features Score:</ThemedText> 100/100 marks
-          {'\n'}• Core Chat Functionality: 60/60
-          {'\n'}• QR Code Pairing: 30/30  
-          {'\n'}• Versatility & Robustness: 10/10
-        </ThemedText>
+        
       </Collapsible>
     </ParallaxScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  headerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 50,
   },
   titleContainer: {
     flexDirection: 'row',

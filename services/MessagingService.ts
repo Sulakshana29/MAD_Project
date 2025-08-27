@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { Socket } from 'socket.io-client';
+import FirebaseService from './FirebaseService';
 
 export interface ChatConnectionInfo {
   sessionId: string;
@@ -20,21 +22,27 @@ class MessagingService {
   private currentUserName: string | null = null;
   private messageListeners: ((message: MessageEventData) => void)[] = [];
   private connectionListeners: ((connected: boolean) => void)[] = [];
+  private isAndroid = Platform.OS === 'android';
+  private usingFirebase = FirebaseService.isEnabled();
+  private firebaseSubscribedForSession: string | null = null;
 
   async initializeConnection(connectionInfo: ChatConnectionInfo): Promise<boolean> {
     try {
-      // For demo purposes, we'll simulate a WebSocket server
-      // In a real app, you'd connect to your actual server
-      this.currentSessionId = connectionInfo.sessionId;
-      this.currentUserName = connectionInfo.userName;
+  // Android-specific initialization
+      if (this.isAndroid) {
+        console.log('Initializing connection for Android platform');
+        // Add Android-specific timeout handling
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Connection timeout on Android')), 10000);
+        });
 
-      // Store connection info for reconnection
-      await AsyncStorage.setItem('currentConnection', JSON.stringify(connectionInfo));
+  const connectionPromise = this.establishConnection(connectionInfo);
+        
+        await Promise.race([connectionPromise, timeoutPromise]);
+      } else {
+        await this.establishConnection(connectionInfo);
+      }
 
-      // Simulate connection success
-      this.notifyConnectionListeners(true);
-      
-      console.log('Chat connection initialized for session:', connectionInfo.sessionId);
       return true;
     } catch (error) {
       console.error('Connection initialization error:', error);
@@ -43,18 +51,52 @@ class MessagingService {
     }
   }
 
-  disconnect(): void {
-    if (this.socket) {
-      this.socket.disconnect();
-      this.socket = null;
+  private async establishConnection(connectionInfo: ChatConnectionInfo): Promise<void> {
+    this.currentSessionId = connectionInfo.sessionId;
+    this.currentUserName = connectionInfo.userName;
+
+    // Store connection info for reconnection
+    await AsyncStorage.setItem('currentConnection', JSON.stringify(connectionInfo));
+
+    if (this.usingFirebase) {
+      await FirebaseService.connect(connectionInfo);
+      // Subscribe to Firestore messages once per session
+      if (this.firebaseSubscribedForSession !== connectionInfo.sessionId) {
+        FirebaseService.subscribeMessages(connectionInfo.sessionId, (msg) => {
+          this.notifyMessageListeners(msg);
+        });
+        this.firebaseSubscribedForSession = connectionInfo.sessionId;
+      }
     }
-    
-    this.currentSessionId = null;
-    this.currentUserName = null;
-    this.notifyConnectionListeners(false);
-    
-    AsyncStorage.removeItem('currentConnection');
-    console.log('Disconnected from chat session');
+
+    // Connection success
+    this.notifyConnectionListeners(true);
+    console.log('Chat connection initialized for session:', connectionInfo.sessionId, this.usingFirebase ? '(Firebase)' : '(Simulated)');
+  }
+
+  disconnect(): void {
+    try {
+      if (this.socket) {
+        this.socket.disconnect();
+        this.socket = null;
+      }
+      if (this.usingFirebase) {
+        FirebaseService.disconnect();
+        this.firebaseSubscribedForSession = null;
+      }
+      
+      this.currentSessionId = null;
+      this.currentUserName = null;
+      this.notifyConnectionListeners(false);
+      
+      AsyncStorage.removeItem('currentConnection').catch(error => {
+        console.error('Error removing connection info:', error);
+      });
+      
+      console.log('Disconnected from chat session');
+    } catch (error) {
+      console.error('Error during disconnect:', error);
+    }
   }
 
   async sendMessage(content: string): Promise<boolean> {
@@ -71,22 +113,44 @@ class MessagingService {
         timestamp: Date.now()
       };
 
-      // In a real app, emit to socket server
-      // this.socket?.emit('message', messageData);
-
-      // For demo, simulate message delivery
-      setTimeout(() => {
-        this.notifyMessageListeners(messageData);
-      }, 100);
-
-      // Simulate receiving a response (for demo purposes)
-      this.simulateIncomingMessage(content);
+      if (this.usingFirebase) {
+        await FirebaseService.sendMessage(messageData.sessionId, messageData.sender, messageData.content);
+        // Rely on Firestore onSnapshot to deliver to listeners on both devices.
+      } else {
+        // Android-specific message handling
+        if (this.isAndroid) {
+          const maxRetries = 3;
+          let retries = 0;
+          while (retries < maxRetries) {
+            try {
+              await this.processMessage(messageData);
+              break;
+            } catch (error) {
+              retries++;
+              if (retries >= maxRetries) throw error;
+              console.warn(`Message send retry ${retries} on Android`);
+              await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+            }
+          }
+        } else {
+          await this.processMessage(messageData);
+        }
+      }
 
       return true;
     } catch (error) {
       console.error('Error sending message:', error);
       return false;
     }
+  }
+
+  private async processMessage(messageData: MessageEventData): Promise<void> {
+    // In a real app, emit to socket server
+    // this.socket?.emit('message', messageData);
+
+    // For demo, simulate message delivery
+    await new Promise(resolve => setTimeout(resolve, 100));
+    this.notifyMessageListeners(messageData);
   }
 
   // Demo method to simulate incoming messages
@@ -105,16 +169,7 @@ class MessagingService {
 
     const randomResponse = responses[Math.floor(Math.random() * responses.length)];
 
-    setTimeout(() => {
-      const incomingMessage: MessageEventData = {
-        sessionId: this.currentSessionId!,
-        sender: 'Chat Partner',
-        content: randomResponse,
-        timestamp: Date.now()
-      };
-
-      this.notifyMessageListeners(incomingMessage);
-    }, 1000 + Math.random() * 2000); // Random delay between 1-3 seconds
+  // Simulation disabled for real-user demo
   }
 
   addMessageListener(listener: (message: MessageEventData) => void): void {

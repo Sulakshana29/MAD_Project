@@ -3,7 +3,7 @@
  */
 
 const tintColorLight = '#007AFF';  // iOS Blue
-const tintColorDark = '#00D4FF';   // Bright Cyan
+const tintColorDark = '#00aaffff';   // Bright Cyan
 
 export const Colors = {
   light: {
@@ -41,8 +41,8 @@ export const Colors = {
     tabIconSelected: tintColorDark,
     
     // Chat-specific colors
-    primary: '#00D4FF',        // Bright cyan
-    secondary: '#BF5AF2',      // Bright purple
+    primary: '#00aaffff',        // Bright cyan
+    secondary: '#000000ff',      // Bright purple
     success: '#30D158',        // Bright green
     warning: '#FF9F0A',        // Bright orange
     danger: '#FF453A',         // Bright red

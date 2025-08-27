@@ -5,18 +5,18 @@ import QRCodeService from '@/services/QRCodeService';
 import { BarcodeScanningResult, CameraView } from 'expo-camera';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Modal,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 interface QRScannerProps {
-  onConnectionEstablished: (sessionId: string) => void;
+  onConnectionEstablished: (sessionId: string, participantName?: string) => void;
 }
 
 export default function QRScanner({ onConnectionEstablished }: QRScannerProps) {
@@ -112,7 +112,7 @@ export default function QRScanner({ onConnectionEstablished }: QRScannerProps) {
           `You've successfully connected to ${scannedData.userName}'s chat session.`,
           [{ text: 'Start Chatting', onPress: () => {
             setShowNameInput(false);
-            onConnectionEstablished(scannedData.sessionId);
+            onConnectionEstablished(scannedData.sessionId, scannedData.userName);
           }}]
         );
       } else {
@@ -197,7 +197,7 @@ export default function QRScanner({ onConnectionEstablished }: QRScannerProps) {
           </View>
           
           <TouchableOpacity
-            style={[styles.cancelButton, { backgroundColor: colors.background }]}
+            style={[styles.cancelButton, styles.manualButton, { borderColor: colors.borderColor }]}
             onPress={() => setScanning(false)}
           >
             <Text style={[styles.cancelButtonText, { color: colors.text }]}>
@@ -264,13 +264,13 @@ export default function QRScanner({ onConnectionEstablished }: QRScannerProps) {
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={[styles.modalButton, { backgroundColor: colors.secondary }]}
+                style={[styles.modalButton, styles.modalButtonOutlined, { borderColor: colors.borderColor }]}
                 onPress={() => {
                   setShowManualInput(false);
                   setManualCode('');
                 }}
               >
-                <Text style={styles.buttonText}>Cancel</Text>
+                <Text style={[styles.manualButtonText, { color: colors.text }]}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -333,7 +333,7 @@ export default function QRScanner({ onConnectionEstablished }: QRScannerProps) {
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={[styles.modalButton, { backgroundColor: colors.secondary }]}
+                style={[styles.modalButton, styles.modalButtonOutlined, { borderColor: colors.borderColor }]}
                 onPress={() => {
                   setShowNameInput(false);
                   setUserName('');
@@ -341,7 +341,7 @@ export default function QRScanner({ onConnectionEstablished }: QRScannerProps) {
                 }}
                 disabled={isConnecting}
               >
-                <Text style={styles.buttonText}>Cancel</Text>
+                <Text style={[styles.manualButtonText, { color: colors.text }]}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonText: {
-    color: 'white',
+  color: '#fffdfdff',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -493,6 +493,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 50,
+  },
+  modalButtonOutlined: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
   },
   disabledButton: {
     opacity: 0.6,

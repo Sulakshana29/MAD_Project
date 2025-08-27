@@ -3,20 +3,23 @@ import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import DatabaseService, { Message } from '@/services/DatabaseService';
 import MessagingService, { MessageEventData } from '@/services/MessagingService';
+import QRCodeService from '@/services/QRCodeService';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    ToastAndroid,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  ToastAndroid,
+  TouchableOpacity,
+  View
 } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 
 interface ChatInterfaceProps {
   sessionId: string;
@@ -32,6 +35,9 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [qrValue, setQrValue] = useState('');
+  const [hostName, setHostName] = useState('');
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -71,6 +77,9 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
       // Check if messaging service is connected
       setIsConnected(MessagingService.isConnected());
       
+      // Try to recreate QR code for current session
+      await generateSessionQR();
+      
       // Scroll to bottom
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: false });
@@ -81,6 +90,24 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
       Alert.alert('Error', 'Failed to load chat history');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const generateSessionQR = async () => {
+    try {
+      const currentUserName = MessagingService.getCurrentUserName();
+      if (currentUserName) {
+        // Create QR data for current session
+        const qrData = QRCodeService.generateQRCodeData(currentUserName);
+        qrData.sessionId = sessionId;
+        qrData.timestamp = Date.now();
+        
+        const qrString = JSON.stringify(qrData);
+        setQrValue(qrString);
+        setHostName(currentUserName);
+      }
+    } catch (error) {
+      console.error('Error generating session QR:', error);
     }
   };
 
@@ -202,13 +229,13 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
         )}
         <Text style={[
           styles.messageText,
-          { color: item.isOwn ? 'white' : colors.text }
+          { color: item.isOwn ? (Colors[colorScheme ?? 'light'].myMessageText) : (Colors[colorScheme ?? 'light'].otherMessageText || colors.text) }
         ]}>
           {item.content}
         </Text>
         <Text style={[
           styles.messageTime,
-          { color: item.isOwn ? 'rgba(255,255,255,0.7)' : colors.text + '80' }
+          { color: item.isOwn ? Colors[colorScheme ?? 'light'].myMessageText : (colors.text + '80') }
         ]}>
           {formatTime(item.timestamp)}
         </Text>
@@ -238,6 +265,16 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
           Chat Session
         </Text>
         <View style={styles.headerRight}>
+          <TouchableOpacity 
+            onPress={() => setShowQRModal(true)}
+            style={styles.qrButton}
+          >
+            <IconSymbol 
+              name="qrcode" 
+              size={24} 
+              color={colors.primary} 
+            />
+          </TouchableOpacity>
           <View style={[
             styles.connectionIndicator,
             { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }
@@ -310,6 +347,39 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
           )}
         </TouchableOpacity>
       </View>
+
+      {/* QR Code Modal */}
+      <Modal
+        visible={showQRModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowQRModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+            <View style={styles.modalHeader}>
+              <View />
+              <TouchableOpacity onPress={() => setShowQRModal(false)}>
+                <IconSymbol name="xmark" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {qrValue && (
+              <View style={styles.qrModalContainer}>
+                <View style={styles.qrCodeWrapper}>
+                  <QRCode
+                    value={qrValue}
+                    size={240}
+                    color={colors.text}
+                    backgroundColor="white"
+                  />
+                </View>
+                {/* Labels removed for a cleaner QR-only view */}
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -341,7 +411,10 @@ const styles = StyleSheet.create({
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
+  },
+  qrButton: {
+    padding: 4,
   },
   connectionIndicator: {
     width: 8,
@@ -418,5 +491,67 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    borderRadius: 16,
+    padding: 0,
+    width: '90%',
+    maxWidth: 400,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  qrModalContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  qrCodeWrapper: {
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+  },
+  qrInstructions: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 22,
+  },
+  sessionInfo: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  hostInfo: {
+    fontSize: 12,
+    textAlign: 'center',
+    opacity: 0.7,
   },
 });

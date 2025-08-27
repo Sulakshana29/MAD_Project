@@ -2,21 +2,22 @@ import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import MessagingService from '@/services/MessagingService';
 import QRCodeService from '@/services/QRCodeService';
+import * as Clipboard from 'expo-clipboard';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Share,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
 interface QRGeneratorProps {
-  onConnectionEstablished: (sessionId: string) => void;
+  onConnectionEstablished: (sessionId: string, participantName?: string) => void;
 }
 
 export default function QRGenerator({ onConnectionEstablished }: QRGeneratorProps) {
@@ -27,6 +28,7 @@ export default function QRGenerator({ onConnectionEstablished }: QRGeneratorProp
   const [qrValue, setQrValue] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isWaitingForConnection, setIsWaitingForConnection] = useState(false);
+  const [generatedSessionId, setGeneratedSessionId] = useState<string | null>(null);
 
   const generateQRCode = async () => {
     if (!userName.trim()) {
@@ -43,6 +45,7 @@ export default function QRGenerator({ onConnectionEstablished }: QRGeneratorProp
       // Parse the QR data to get session ID
       const qrData = QRCodeService.parseQRCodeData(qrString);
       if (qrData) {
+        setGeneratedSessionId(qrData.sessionId);
         // Initialize connection for the host
         const connected = await MessagingService.initializeConnection({
           sessionId: qrData.sessionId,
@@ -50,22 +53,8 @@ export default function QRGenerator({ onConnectionEstablished }: QRGeneratorProp
           serverUrl: qrData.serverUrl
         });
 
-        if (connected) {
-          Alert.alert(
-            'QR Code Generated!',
-            'Share this QR code with someone to start chatting. The code will expire in 1 hour.',
-            [
-              { text: 'OK' },
-              { 
-                text: 'Share QR', 
-                onPress: () => shareQRCode(qrString) 
-              }
-            ]
-          );
-          
-          // Auto-navigate to chat after generating QR
-          onConnectionEstablished(qrData.sessionId);
-        }
+        // Keep QR visible; user will choose when to open chat.
+        // We still show controls below (share/copy/open chat).
       }
     } catch (error) {
       console.error('Error generating QR code:', error);
@@ -75,36 +64,63 @@ export default function QRGenerator({ onConnectionEstablished }: QRGeneratorProp
     }
   };
 
+  const copyToClipboard = async (qrString: string) => {
+    try {
+      await Clipboard.setStringAsync(qrString);
+      Alert.alert('Copied!', 'QR code data copied to clipboard. You can share it manually.');
+    } catch (error) {
+      console.error('Error copying to clipboard:', error);
+      Alert.alert('Error', 'Failed to copy to clipboard.');
+    }
+  };
+
   const shareQRCode = async (qrString: string) => {
     try {
+      const qrData = QRCodeService.parseQRCodeData(qrString);
+      if (!qrData) {
+        Alert.alert('Error', 'Invalid QR code data');
+        return;
+      }
+
+      // Create a user-friendly sharing message
+      const shareMessage = `🚀 Join my InstantChat session!
+
+👤 Host: ${qrData.userName}
+📱 Session ID: ${qrData.sessionId}
+⏰ Valid until: ${new Date(qrData.timestamp + 60 * 60 * 1000).toLocaleString()}
+
+📋 To join:
+1. Open InstantChat app
+2. Tap "Scan QR Code"
+3. Tap "Enter Code Manually"
+4. Paste this data: ${qrString}
+
+Or scan the QR code directly!`;
+
       await Share.share({
-        message: `Join my InstantChat session! Scan this QR code or use this data: ${qrString}`,
-        title: 'InstantChat Invitation'
+        message: shareMessage,
+        title: 'Join my InstantChat session!'
       });
     } catch (error) {
       console.error('Error sharing QR code:', error);
+      Alert.alert('Error', 'Failed to share QR code. Please try again.');
     }
   };
 
   const resetQRCode = () => {
     setQrValue('');
     setIsWaitingForConnection(false);
+  setGeneratedSessionId(null);
     MessagingService.disconnect();
   };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.title, { color: colors.text }]}>
-        Generate QR Code
-      </Text>
-      
-      <Text style={[styles.subtitle, { color: colors.text }]}>
-        Create a QR code for others to scan and start chatting
-      </Text>
+  {/* Minimal header to focus on QR */}
 
       {!qrValue ? (
         <View style={styles.inputContainer}>
-          <Text style={[styles.label, { color: colors.text }]}>
+          <Text style={[styles.label, { color: colors.text, textAlign: 'center'}]}>
             Enter your name:
           </Text>
           <TextInput
@@ -142,25 +158,42 @@ export default function QRGenerator({ onConnectionEstablished }: QRGeneratorProp
         </View>
       ) : (
         <View style={styles.qrContainer}>
-          <View style={styles.qrCodeWrapper}>
+      <View style={styles.qrCodeWrapper}>
             <QRCode
               value={qrValue}
-              size={200}
+        size={240}
               color={colors.text}
               backgroundColor={colors.background}
             />
           </View>
-          
-          <Text style={[styles.instructions, { color: colors.text }]}>
-            Ask someone to scan this QR code with the InstantChat app to start chatting!
-          </Text>
+      {/* Removed instruction text for cleaner UI */}
 
           <View style={styles.buttonContainer}>
+            {/* Primary action to proceed when ready */}
+    <TouchableOpacity
+              style={[styles.shareButton, { backgroundColor: colors.primary }]}
+              onPress={() => {
+                if (generatedSessionId) {
+      // For the host, the participant name is initially unknown.
+      onConnectionEstablished(generatedSessionId, 'Chat Partner');
+                }
+              }}
+            >
+              <Text style={styles.buttonText}>✅ Open Chat</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity
               style={[styles.shareButton, { backgroundColor: colors.primary }]}
               onPress={() => shareQRCode(qrValue)}
             >
-              <Text style={styles.buttonText}>Share QR Code</Text>
+              <Text style={styles.buttonText}>📤 Share Invitation</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.copyButton,{ borderColor: colors.borderColor }]}
+              onPress={() => copyToClipboard(qrValue)}
+            >
+              <Text style={styles.buttonText}>📋 Copy Code</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -168,12 +201,12 @@ export default function QRGenerator({ onConnectionEstablished }: QRGeneratorProp
               onPress={resetQRCode}
             >
               <Text style={[styles.resetButtonText, { color: colors.text }]}>
-                Generate New
+                🔄 Generate New
               </Text>
             </TouchableOpacity>
           </View>
 
-          {isWaitingForConnection && (
+      {isWaitingForConnection && (
             <View style={styles.waitingContainer}>
               <ActivityIndicator 
                 size="small" 
@@ -181,7 +214,7 @@ export default function QRGenerator({ onConnectionEstablished }: QRGeneratorProp
                 style={styles.waitingSpinner}
               />
               <Text style={[styles.waitingText, { color: colors.text }]}>
-                Ready to chat! QR code is active.
+        QR is active. Ask your friend to scan, then tap "Open Chat".
               </Text>
             </View>
           )}
@@ -205,10 +238,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 30,
-    opacity: 0.8,
+    display: 'none',
   },
   inputContainer: {
     width: '100%',
@@ -246,7 +276,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   qrCodeWrapper: {
-    padding: 20,
+  padding: 16,
     borderRadius: 15,
     backgroundColor: 'white',
     shadowColor: '#000',
@@ -257,15 +287,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
-    marginBottom: 20,
+    marginBottom: 12,
   },
-  instructions: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 30,
-    paddingHorizontal: 20,
-    lineHeight: 22,
-  },
+  instructions: { display: 'none' },
   buttonContainer: {
     flexDirection: 'column',
     gap: 15,
@@ -276,6 +300,12 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
+  },
+  copyButton: {
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
   },
   resetButton: {
     padding: 12,

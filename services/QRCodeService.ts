@@ -1,4 +1,3 @@
-import { BarCodeScanner, BarCodeScannerResult } from 'expo-barcode-scanner';
 import { Camera } from 'expo-camera';
 import * as Crypto from 'expo-crypto';
 
@@ -86,15 +85,6 @@ class QRCodeService {
       console.error('Error parsing QR code data:', error);
       return null;
     }
-  }
-
-  validateQRCodeScanResult(result: BarCodeScannerResult): QRCodeData | null {
-    if (result.type !== BarCodeScanner.Constants.BarCodeType.qr) {
-      console.error('Not a QR code');
-      return null;
-    }
-
-    return this.parseQRCodeData(result.data);
   }
 
   async checkCameraPermissions(): Promise<{

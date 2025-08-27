@@ -1,3 +1,4 @@
+import AppLogo from '@/components/AppLogo';
 import ChatHistory from '@/components/ChatHistory';
 import ChatInterface from '@/components/ChatInterface';
 import QRGenerator from '@/components/QRGenerator';
@@ -10,6 +11,7 @@ import DatabaseService from '@/services/DatabaseService';
 import MessagingService from '@/services/MessagingService';
 import React, { useEffect, useState } from 'react';
 import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type AppState = 'menu' | 'generate' | 'scan' | 'chat' | 'history';
 
@@ -40,9 +42,22 @@ export default function HomeScreen() {
     }
   };
 
-  const handleConnectionEstablished = (sessionId: string) => {
+  const handleConnectionEstablished = async (sessionId: string, participantName?: string) => {
     setCurrentSessionId(sessionId);
     setAppState('chat');
+
+    // Save chat session so it appears in history
+    try {
+      const now = Date.now();
+      await DatabaseService.saveChatSession({
+        sessionId,
+        participantName: participantName || 'Chat Partner',
+        createdAt: now,
+        lastMessageAt: now,
+      });
+    } catch (err) {
+      console.warn('Failed to save chat session:', err);
+    }
   };
 
   const handleDisconnect = () => {
@@ -58,7 +73,7 @@ export default function HomeScreen() {
   if (!isInitialized) {
     return (
       <ThemedView style={[styles.container, styles.center]}>
-        <ThemedText type="title">InstantChat</ThemedText>
+        <AppLogo size="large" />
         <ThemedText>Initializing...</ThemedText>
       </ThemedView>
     );
@@ -99,10 +114,8 @@ export default function HomeScreen() {
         return (
           <View style={[styles.container, { backgroundColor: colors.background }]}>
             <ThemedView style={styles.header}>
-              <ThemedText type="title" style={[styles.title, { color: colors.primary }]}>
-                InstantChat
-              </ThemedText>
-              <ThemedText style={[styles.subtitle, { color: colors.text }]}>
+              <AppLogo size="large" />
+              <ThemedText style={[styles.subtitle, { color: colors.text, marginTop: 20 }]}>
                 Connect instantly with QR codes
               </ThemedText>
             </ThemedView>
@@ -138,7 +151,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {appState !== 'menu' && (
         <View style={[styles.backButton, { borderBottomColor: colors.text + '20' }]}>
           <TouchableOpacity onPress={() => setAppState('menu')}>
@@ -151,7 +164,7 @@ export default function HomeScreen() {
         </View>
       )}
       {renderContent()}
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -192,10 +205,13 @@ const styles = StyleSheet.create({
   center: {
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 20, // Add horizontal padding for phone edges
   },
   header: {
-    padding: 30,
-    alignItems: 'center',
+    paddingTop: 20,        // Reduced top padding 
+    paddingHorizontal: 30, // Keep horizontal padding
+    paddingBottom: 20,     // Add bottom padding
+    alignItems: 'center',  // Center align - change to 'flex-start' for left align
   },
   title: {
     fontSize: 32,
@@ -206,11 +222,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     textAlign: 'center',
     opacity: 0.8,
+    paddingHorizontal: 20, // Add padding for better text wrapping
   },
   menuContainer: {
     flex: 1,
-    padding: 20,
-    gap: 20,
+    paddingHorizontal: 20, // Side margins
+    paddingVertical: 10,   // Top/bottom spacing
+    gap: 15,              // Reduced gap for better fit
+    justifyContent: 'flex-start', // Align buttons to top
   },
   menuButton: {
     padding: 20,
@@ -224,7 +243,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 5,
-    marginVertical: 8,
+    marginVertical: 5,    // Reduced margin
   },
   buttonTitle: {
     fontSize: 18,
@@ -236,7 +255,8 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   backButton: {
-    padding: 16,
+    paddingHorizontal: 20, // Better horizontal padding
+    paddingVertical: 12,   // Vertical padding
     borderBottomWidth: 1,
   },
   backText: {
