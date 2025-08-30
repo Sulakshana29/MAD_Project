@@ -6,18 +6,18 @@ import MessagingService, { MessageEventData } from '@/services/MessagingService'
 import QRCodeService from '@/services/QRCodeService';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  ToastAndroid,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    ToastAndroid,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
@@ -131,6 +131,20 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
       
       // Update session timestamp
       await DatabaseService.updateSessionLastMessage(sessionId, messageData.timestamp);
+
+      // If this is the first non-own message, update session participant name to the sender
+      if (!isOwnMessage) {
+        try {
+          await DatabaseService.saveChatSession({
+            sessionId,
+            participantName: messageData.sender,
+            createdAt: Date.now(),
+            lastMessageAt: messageData.timestamp,
+          });
+        } catch (e) {
+          // ignore minor errors
+        }
+      }
       
       // Scroll to bottom
       setTimeout(() => {

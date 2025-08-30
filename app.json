@@ -69,10 +69,13 @@
     },
     "extra": {
       "firebase": {
-        "apiKey": "",
-        "authDomain": "",
-        "projectId": "",
-        "appId": ""
+        "apiKey": "AIzaSyCqfM-HwnItUgsFkKrRFkEQ15vpEmXewlg",
+        "authDomain": "instantchat-930dc.firebaseapp.com",
+        "projectId": "instantchat-930dc",
+        "storageBucket": "instantchat-930dc.firebasestorage.app",
+        "messagingSenderId": "456711816204",
+        "appId": "1:456711816204:web:ba39516bb65d404e455a29",
+        "measurementId": "G-EPRVJ2KXRC"
       }
     }
   }

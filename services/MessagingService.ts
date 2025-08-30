@@ -23,26 +23,20 @@ class MessagingService {
   private messageListeners: ((message: MessageEventData) => void)[] = [];
   private connectionListeners: ((connected: boolean) => void)[] = [];
   private isAndroid = Platform.OS === 'android';
-  private usingFirebase = FirebaseService.isEnabled();
   private firebaseSubscribedForSession: string | null = null;
 
   async initializeConnection(connectionInfo: ChatConnectionInfo): Promise<boolean> {
     try {
-  // Android-specific initialization
+      // Android-specific initialization with timeout guard
       if (this.isAndroid) {
-        console.log('Initializing connection for Android platform');
-        // Add Android-specific timeout handling
         const timeoutPromise = new Promise((_, reject) => {
           setTimeout(() => reject(new Error('Connection timeout on Android')), 10000);
         });
-
-  const connectionPromise = this.establishConnection(connectionInfo);
-        
+        const connectionPromise = this.establishConnection(connectionInfo);
         await Promise.race([connectionPromise, timeoutPromise]);
       } else {
         await this.establishConnection(connectionInfo);
       }
-
       return true;
     } catch (error) {
       console.error('Connection initialization error:', error);
@@ -58,7 +52,7 @@ class MessagingService {
     // Store connection info for reconnection
     await AsyncStorage.setItem('currentConnection', JSON.stringify(connectionInfo));
 
-    if (this.usingFirebase) {
+    if (FirebaseService.isEnabled()) {
       await FirebaseService.connect(connectionInfo);
       // Subscribe to Firestore messages once per session
       if (this.firebaseSubscribedForSession !== connectionInfo.sessionId) {
@@ -71,7 +65,11 @@ class MessagingService {
 
     // Connection success
     this.notifyConnectionListeners(true);
-    console.log('Chat connection initialized for session:', connectionInfo.sessionId, this.usingFirebase ? '(Firebase)' : '(Simulated)');
+    console.log(
+      'Chat connection initialized for session:',
+      connectionInfo.sessionId,
+      FirebaseService.isEnabled() ? '(Firebase)' : '(Local-only)'
+    );
   }
 
   disconnect(): void {
@@ -80,19 +78,19 @@ class MessagingService {
         this.socket.disconnect();
         this.socket = null;
       }
-      if (this.usingFirebase) {
+      if (FirebaseService.isEnabled()) {
         FirebaseService.disconnect();
         this.firebaseSubscribedForSession = null;
       }
-      
+
       this.currentSessionId = null;
       this.currentUserName = null;
       this.notifyConnectionListeners(false);
-      
+
       AsyncStorage.removeItem('currentConnection').catch(error => {
         console.error('Error removing connection info:', error);
       });
-      
+
       console.log('Disconnected from chat session');
     } catch (error) {
       console.error('Error during disconnect:', error);
@@ -110,14 +108,18 @@ class MessagingService {
         sessionId: this.currentSessionId,
         sender: this.currentUserName,
         content,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
-      if (this.usingFirebase) {
-        await FirebaseService.sendMessage(messageData.sessionId, messageData.sender, messageData.content);
-        // Rely on Firestore onSnapshot to deliver to listeners on both devices.
+      if (FirebaseService.isEnabled()) {
+        await FirebaseService.sendMessage(
+          messageData.sessionId,
+          messageData.sender,
+          messageData.content
+        );
+        // Delivery handled by Firestore onSnapshot on each device
       } else {
-        // Android-specific message handling
+        // Local-only fallback: deliver to this device listeners
         if (this.isAndroid) {
           const maxRetries = 3;
           let retries = 0;
@@ -145,31 +147,9 @@ class MessagingService {
   }
 
   private async processMessage(messageData: MessageEventData): Promise<void> {
-    // In a real app, emit to socket server
-    // this.socket?.emit('message', messageData);
-
-    // For demo, simulate message delivery
+    // In a real app, emit to socket server; here we just notify local listeners
     await new Promise(resolve => setTimeout(resolve, 100));
     this.notifyMessageListeners(messageData);
-  }
-
-  // Demo method to simulate incoming messages
-  private simulateIncomingMessage(originalContent: string): void {
-    if (!this.currentSessionId) return;
-
-    // Simulate various responses based on the message content
-    const responses = [
-      "That's interesting!",
-      "I see what you mean.",
-      "Thanks for sharing that.",
-      "Could you tell me more?",
-      "I agree with you.",
-      "That's a good point."
-    ];
-
-    const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-
-  // Simulation disabled for real-user demo
   }
 
   addMessageListener(listener: (message: MessageEventData) => void): void {

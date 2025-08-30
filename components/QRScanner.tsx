@@ -25,6 +25,7 @@ export default function QRScanner({ onConnectionEstablished }: QRScannerProps) {
   
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [isProcessingScan, setIsProcessingScan] = useState(false);
   const [showManualInput, setShowManualInput] = useState(false);
   const [manualCode, setManualCode] = useState('');
   const [userName, setUserName] = useState('');
@@ -55,9 +56,11 @@ export default function QRScanner({ onConnectionEstablished }: QRScannerProps) {
   };
 
   const handleBarcodeScanned = ({ data }: BarcodeScanningResult) => {
-    if (scanning) return; // Prevent multiple scans
-    
-    setScanning(false);
+    // Only handle when scanning view is active and we're not already processing a scan
+    if (!scanning || isProcessingScan) return;
+
+    setIsProcessingScan(true);
+    setScanning(false); // hide camera immediately to pause further scans
     processQRCode(data);
   };
 
@@ -65,11 +68,11 @@ export default function QRScanner({ onConnectionEstablished }: QRScannerProps) {
     const parsedData = QRCodeService.parseQRCodeData(qrData);
     
     if (!parsedData) {
-      Alert.alert(
+    Alert.alert(
         'Invalid QR Code',
         'This QR code is not valid for InstantChat or has expired.',
         [
-          { text: 'Try Again', onPress: () => setScanning(true) },
+      { text: 'Try Again', onPress: () => { setIsProcessingScan(false); setScanning(true); } },
           { text: 'Cancel' }
         ]
       );
@@ -86,7 +89,7 @@ export default function QRScanner({ onConnectionEstablished }: QRScannerProps) {
       return;
     }
 
-    processQRCode(manualCode.trim());
+  processQRCode(manualCode.trim());
     setShowManualInput(false);
     setManualCode('');
   };
@@ -107,14 +110,9 @@ export default function QRScanner({ onConnectionEstablished }: QRScannerProps) {
       });
 
       if (connected) {
-        Alert.alert(
-          'Connected!',
-          `You've successfully connected to ${scannedData.userName}'s chat session.`,
-          [{ text: 'Start Chatting', onPress: () => {
-            setShowNameInput(false);
-            onConnectionEstablished(scannedData.sessionId, scannedData.userName);
-          }}]
-        );
+        // Go straight to chat for a smoother UX
+        setShowNameInput(false);
+        onConnectionEstablished(scannedData.sessionId, scannedData.userName);
       } else {
         throw new Error('Failed to establish connection');
       }
@@ -178,7 +176,7 @@ export default function QRScanner({ onConnectionEstablished }: QRScannerProps) {
         Scan QR Code
       </Text>
       
-      <Text style={[styles.subtitle, { color: colors.text }]}>
+  <Text style={[styles.subtitle, { color: colors.text }]}>
         Point your camera at the QR code to connect
       </Text>
 
@@ -198,7 +196,7 @@ export default function QRScanner({ onConnectionEstablished }: QRScannerProps) {
           
           <TouchableOpacity
             style={[styles.cancelButton, styles.manualButton, { borderColor: colors.borderColor }]}
-            onPress={() => setScanning(false)}
+            onPress={() => { setScanning(false); setIsProcessingScan(false); }}
           >
             <Text style={[styles.cancelButtonText, { color: colors.text }]}>
               Cancel
@@ -209,7 +207,7 @@ export default function QRScanner({ onConnectionEstablished }: QRScannerProps) {
         <View style={styles.buttonContainer}>
           <TouchableOpacity
             style={[styles.button, { backgroundColor: colors.primary }]}
-            onPress={() => setScanning(true)}
+            onPress={() => { setIsProcessingScan(false); setScanning(true); }}
           >
             <Text style={styles.buttonText}>Start Scanning</Text>
           </TouchableOpacity>
