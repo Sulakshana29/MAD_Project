@@ -4,7 +4,7 @@
     "slug": "instantchat",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/2.jpg",
     "scheme": "instantchat",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -57,7 +57,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/2.jpg",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#007AFF"

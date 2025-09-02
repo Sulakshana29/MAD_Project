@@ -5,14 +5,14 @@ import QRCodeService from '@/services/QRCodeService';
 import * as Clipboard from 'expo-clipboard';
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Share,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Share,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
@@ -158,12 +158,12 @@ Or scan the QR code directly!`;
         </View>
       ) : (
         <View style={styles.qrContainer}>
-      <View style={styles.qrCodeWrapper}>
+      <View style={[styles.qrCodeWrapper, { backgroundColor: colors.cardBackground }]}>
             <QRCode
               value={qrValue}
         size={240}
               color={colors.text}
-              backgroundColor={colors.background}
+              backgroundColor={colors.cardBackground}
             />
           </View>
       {/* Removed instruction text for cleaner UI */}
@@ -193,16 +193,14 @@ Or scan the QR code directly!`;
               style={[styles.copyButton,{ borderColor: colors.borderColor }]}
               onPress={() => copyToClipboard(qrValue)}
             >
-              <Text style={styles.buttonText}>📋 Copy Code</Text>
+              <Text style={[styles.copyText, { color: colors.text }]}>📋 Copy Code</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.resetButton, { borderColor: colors.borderColor }]}
               onPress={resetQRCode}
             >
-              <Text style={[styles.resetButtonText, { color: colors.text }]}>
-                🔄 Generate New
-              </Text>
+              <Text style={[styles.resetButtonText, { color: colors.text }]}>🔄 Generate New</Text>
             </TouchableOpacity>
           </View>
 
@@ -213,9 +211,7 @@ Or scan the QR code directly!`;
                 color={colors.primary} 
                 style={styles.waitingSpinner}
               />
-              <Text style={[styles.waitingText, { color: colors.text }]}>
-        QR is active. Ask your friend to scan, then tap "Open Chat".
-              </Text>
+              <Text style={[styles.waitingText, { color: colors.text }]}>QR is active. Ask your friend to scan, then tap "Open Chat".</Text>
             </View>
           )}
         </View>
@@ -276,9 +272,9 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   qrCodeWrapper: {
-  padding: 16,
-    borderRadius: 15,
-    backgroundColor: 'white',
+  padding: 20,
+    borderRadius: 20,
+    backgroundColor: '#fff',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -292,30 +288,38 @@ const styles = StyleSheet.create({
   instructions: { display: 'none' },
   buttonContainer: {
     flexDirection: 'column',
-    gap: 15,
+    gap: 12,
     width: '100%',
-    maxWidth: 250,
+    maxWidth: 300,
   },
   shareButton: {
-    padding: 12,
-    borderRadius: 8,
+    padding: 14,
+    borderRadius: 12,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
   },
   copyButton: {
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
     borderWidth: 1,
+    justifyContent: 'center',
   },
   resetButton: {
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
     borderWidth: 1,
+    justifyContent: 'center',
   },
   resetButtonText: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  copyText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   waitingContainer: {
     flexDirection: 'row',

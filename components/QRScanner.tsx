@@ -5,14 +5,14 @@ import QRCodeService from '@/services/QRCodeService';
 import { BarcodeScanningResult, CameraView } from 'expo-camera';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Modal,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
 interface QRScannerProps {
@@ -414,24 +414,32 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: 'rgba(0,0,0,0.15)',
   },
   scanArea: {
     width: 200,
     height: 200,
-    borderWidth: 2,
-    borderColor: 'white',
-    borderRadius: 10,
-    backgroundColor: 'transparent',
+  borderWidth: 2,
+  borderColor: 'rgba(255,255,255,0.95)',
+  borderRadius: 12,
+  backgroundColor: 'transparent',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 6 },
+  shadowOpacity: 0.25,
+  shadowRadius: 8,
   },
   cancelButton: {
     position: 'absolute',
     bottom: 20,
     alignSelf: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
+  paddingHorizontal: 20,
+  paddingVertical: 10,
+  borderRadius: 20,
+  backgroundColor: 'rgba(255,255,255,0.12)',
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.2)',
   },
   cancelButtonText: {
     fontSize: 16,

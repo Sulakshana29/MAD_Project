@@ -22,7 +22,7 @@ export default function AppLogo({ size = 'medium', showText = true, useImage = t
 
   const currentSize = logoSizes[size];
 
-  const source = imageSource || require('../assets/images/icon.jpeg');
+  const source = imageSource || require('../assets/images/2.jpg');
 
   return (
     <View style={styles.container}>

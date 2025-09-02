@@ -38,6 +38,7 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrValue, setQrValue] = useState('');
   const [hostName, setHostName] = useState('');
+  const [participantName, setParticipantName] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -79,6 +80,15 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
       
       // Try to recreate QR code for current session
       await generateSessionQR();
+
+      // Load saved session info to show participant name if available
+      try {
+        const sessions = await DatabaseService.getChatSessions();
+        const s = sessions.find(ss => ss.sessionId === sessionId);
+        if (s) setParticipantName(s.participantName || null);
+      } catch (e) {
+        // ignore
+      }
       
       // Scroll to bottom
       setTimeout(() => {
@@ -141,6 +151,7 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
             createdAt: Date.now(),
             lastMessageAt: messageData.timestamp,
           });
+          setParticipantName(messageData.sender);
         } catch (e) {
           // ignore minor errors
         }
@@ -231,6 +242,7 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
     ]}>
       <View style={[
         styles.messageBubble,
+        item.isOwn ? styles.ownMessageBubble : styles.otherMessageBubble,
         {
           backgroundColor: item.isOwn ? colors.myMessage : colors.otherMessage,
           borderColor: colors.borderColor
@@ -275,9 +287,14 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
     >
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.borderColor }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          Chat Session
-        </Text>
+        <View>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Chat Session</Text>
+          {participantName ? (
+            <Text style={[styles.headerSubtitle, { color: colors.placeholderText }]}>{participantName}</Text>
+          ) : (
+            <Text style={[styles.headerSubtitle, { color: colors.placeholderText }]}>Waiting for participant</Text>
+          )}
+        </View>
         <View style={styles.headerRight}>
           <TouchableOpacity 
             onPress={() => setShowQRModal(true)}
@@ -348,7 +365,7 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
             styles.sendButton,
             { 
               backgroundColor: colors.primary,
-              opacity: (!inputText.trim() || isSending) ? 0.5 : 1
+              opacity: (!inputText.trim() || isSending) ? 0.6 : 1
             }
           ]}
           onPress={sendMessage}
@@ -357,7 +374,7 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
           {isSending ? (
             <ActivityIndicator size="small" color="white" />
           ) : (
-            <IconSymbol name="paperplane.fill" size={20} color="white" />
+            <IconSymbol name="paperplane.fill" size={18} color="white" />
           )}
         </TouchableOpacity>
       </View>
@@ -422,6 +439,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
+  headerSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+  },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -467,6 +488,23 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
   },
+  ownMessageBubble: {
+    borderTopRightRadius: 4,
+    borderTopLeftRadius: 16,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  otherMessageBubble: {
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 16,
+    borderBottomLeftRadius: 4,
+    borderBottomRightRadius: 16,
+  },
   senderName: {
     fontSize: 12,
     fontWeight: '600',
@@ -479,8 +517,9 @@ const styles = StyleSheet.create({
   },
   messageTime: {
     fontSize: 12,
-    marginTop: 4,
+    marginTop: 6,
     textAlign: 'right',
+    opacity: 0.8,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -505,6 +544,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
   },
   // Modal styles
   modalOverlay: {
