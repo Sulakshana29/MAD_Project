@@ -121,83 +121,71 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
     }
   };
 
-  const handleIncomingMessage = async (messageData: MessageEventData) => {
-    try {
-      const isOwnMessage = messageData.sender === MessagingService.getCurrentUserName();
-      
-      const message: Message = {
-        sessionId: messageData.sessionId,
-        sender: messageData.sender,
+  const handleIncomingMessage = (messageData: MessageEventData) => {
+    if (messageData.sessionId === sessionId) {
+      const newMessage: Message = {
+        sessionId,
         content: messageData.content,
+        sender: messageData.sender,
         timestamp: messageData.timestamp,
-        isOwn: isOwnMessage
+        isOwn: false,
       };
-
+      
+      setMessages(prev => [...prev, newMessage]);
+      
       // Save to database
-      await DatabaseService.saveMessage(message);
+      DatabaseService.saveMessage(newMessage);
       
-      // Update local state
-      setMessages(prev => [...prev, message]);
-      
-      // Update session timestamp
-      await DatabaseService.updateSessionLastMessage(sessionId, messageData.timestamp);
-
-      // If this is the first non-own message, update session participant name to the sender
-      if (!isOwnMessage) {
-        try {
-          await DatabaseService.saveChatSession({
-            sessionId,
-            participantName: messageData.sender,
-            createdAt: Date.now(),
-            lastMessageAt: messageData.timestamp,
-          });
-          setParticipantName(messageData.sender);
-        } catch (e) {
-          // ignore minor errors
-        }
-      }
+      // Update session last message time
+      DatabaseService.updateSessionLastMessage(sessionId, messageData.timestamp);
       
       // Scroll to bottom
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
-
-      // Show notification for incoming messages (not own)
-      if (!isOwnMessage) {
-        showToast(`New message from ${messageData.sender}`);
-      }
-      
-    } catch (error) {
-      console.error('Error handling incoming message:', error);
     }
   };
 
   const sendMessage = async () => {
+    if (!inputText.trim() || isSending) return;
+    
     const messageText = inputText.trim();
-    if (!messageText) return;
-
-    if (!isConnected) {
-      Alert.alert('Not Connected', 'Please check your connection and try again.');
-      return;
-    }
-
+    setInputText('');
     setIsSending(true);
+    
     try {
-      // Clear input immediately for better UX
-      setInputText('');
+      // Create message object
+      const message: Message = {
+        sessionId,
+        content: messageText,
+        sender: 'me',
+        timestamp: Date.now(),
+        isOwn: true,
+      };
       
-      // Send message through messaging service
-      const success = await MessagingService.sendMessage(messageText);
+      // Add to local state immediately
+      setMessages(prev => [...prev, message]);
       
-      if (!success) {
-        throw new Error('Failed to send message');
-      }
+      // Save to database
+      await DatabaseService.saveMessage(message);
+      
+      // Update session last message time
+      await DatabaseService.updateSessionLastMessage(sessionId, Date.now());
+      
+      // Send via messaging service
+      await MessagingService.sendMessage(messageText);
+      
+      // Scroll to bottom
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
       
     } catch (error) {
       console.error('Error sending message:', error);
-      // Restore input text on error
-      setInputText(messageText);
-      Alert.alert('Error', 'Failed to send message. Please try again.');
+      Alert.alert('Error', 'Failed to send message');
+      
+      // Remove from local state if failed
+      setMessages(prev => prev.filter(m => m.timestamp !== Date.now()));
     } finally {
       setIsSending(false);
     }
@@ -240,29 +228,43 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
       styles.messageContainer,
       item.isOwn ? styles.ownMessage : styles.otherMessage
     ]}>
-      <View style={[
-        styles.messageBubble,
-        item.isOwn ? styles.ownMessageBubble : styles.otherMessageBubble,
-        {
-          backgroundColor: item.isOwn ? colors.myMessage : colors.otherMessage,
-          borderColor: colors.borderColor
-        }
-      ]}>
-        {!item.isOwn && (
-          <Text style={[styles.senderName, { color: colors.text }]}>
-            {item.sender}
-          </Text>
-        )}
-        <Text style={[
-          styles.messageText,
-          { color: item.isOwn ? (Colors[colorScheme ?? 'light'].myMessageText) : (Colors[colorScheme ?? 'light'].otherMessageText || colors.text) }
-        ]}>
+      {!item.isOwn && participantName && (
+        <Text 
+          style={[styles.senderName, { color: colors.text }]}
+        >
+          {participantName}
+        </Text>
+      )}
+      
+      <View
+        style={[
+          styles.messageBubble,
+          item.isOwn ? styles.ownMessageBubble : styles.otherMessageBubble,
+          {
+            backgroundColor: item.isOwn ? colors.myMessage : colors.otherMessage,
+            borderColor: item.isOwn ? colors.myMessage : colors.borderColor,
+          }
+        ]}
+      >
+        <Text
+          style={[
+            styles.messageText,
+            {
+              color: item.isOwn ? colors.myMessageText : colors.otherMessageText,
+            }
+          ]}
+        >
           {item.content}
         </Text>
-        <Text style={[
-          styles.messageTime,
-          { color: item.isOwn ? Colors[colorScheme ?? 'light'].myMessageText : (colors.text + '80') }
-        ]}>
+        
+        <Text
+          style={[
+            styles.messageTime,
+            {
+              color: item.isOwn ? colors.myMessageText + '80' : colors.otherMessageText + '80',
+            }
+          ]}
+        >
           {formatTime(item.timestamp)}
         </Text>
       </View>

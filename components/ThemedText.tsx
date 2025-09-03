@@ -1,60 +1,98 @@
-import { StyleSheet, Text, type TextProps } from 'react-native';
+import { Colors, DesignTokens } from '@/constants/Colors';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import React from 'react';
+import { Text, TextProps, StyleSheet, Platform, TextStyle } from 'react-native';
 
-import { useThemeColor } from '@/hooks/useThemeColor';
+interface ThemedTextProps extends TextProps {
+  type?: 'h1' | 'h2' | 'h3' | 'h4' | 'body' | 'bodyBold' | 'caption' | 'captionBold' | 'small';
+  variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'muted';
+  weight?: 'normal' | 'medium' | 'semibold' | 'bold';
+  align?: 'auto' | 'left' | 'right' | 'center' | 'justify';
+  children: React.ReactNode;
+}
 
-export type ThemedTextProps = TextProps & {
-  lightColor?: string;
-  darkColor?: string;
-  type?: 'default' | 'title' | 'defaultSemiBold' | 'subtitle' | 'link';
-};
-
-export function ThemedText({
-  style,
-  lightColor,
-  darkColor,
-  type = 'default',
-  ...rest
+export function ThemedText({ 
+  type = 'body', 
+  variant = 'primary',
+  weight,
+  align = 'auto',
+  style, 
+  children, 
+  ...props 
 }: ThemedTextProps) {
-  const color = useThemeColor({ light: lightColor, dark: darkColor }, 'text');
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
+  
+  // Get typography styles with safety check
+  const typographyStyle = DesignTokens.typography[type] as TextStyle;
+  
+  // Safety check - if typographyStyle is undefined, use a default
+  if (!typographyStyle) {
+    console.warn(`Typography style for type '${type}' not found, using default`);
+  }
+  
+  // Get variant color
+  const getVariantColor = () => {
+    switch (variant) {
+      case 'primary':
+        return colors.primary;
+      case 'secondary':
+        return colors.secondary;
+      case 'success':
+        return colors.success;
+      case 'warning':
+        return colors.warning;
+      case 'danger':
+        return colors.danger;
+      case 'muted':
+        return colors.textSecondary;
+      default:
+        return colors.text;
+    }
+  };
+
+  // Get font weight with proper type safety and fallback
+  const getFontWeight = (): TextStyle['fontWeight'] => {
+    if (weight) {
+      switch (weight) {
+        case 'normal':
+          return '400';
+        case 'medium':
+          return '500';
+        case 'semibold':
+          return '600';
+        case 'bold':
+          return '700';
+        default:
+          return typographyStyle?.fontWeight || '400';
+      }
+    }
+    return typographyStyle?.fontWeight || '400';
+  };
 
   return (
     <Text
       style={[
-        { color },
-        type === 'default' ? styles.default : undefined,
-        type === 'title' ? styles.title : undefined,
-        type === 'defaultSemiBold' ? styles.defaultSemiBold : undefined,
-        type === 'subtitle' ? styles.subtitle : undefined,
-        type === 'link' ? styles.link : undefined,
+        styles.base,
+        typographyStyle || {},
+        {
+          color: getVariantColor(),
+          fontWeight: getFontWeight(),
+          textAlign: align,
+        },
         style,
       ]}
-      {...rest}
-    />
+      accessible={true}
+      accessibilityRole="text"
+      {...props}
+    >
+      {children}
+    </Text>
   );
 }
 
 const styles = StyleSheet.create({
-  default: {
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  defaultSemiBold: {
-    fontSize: 16,
-    lineHeight: 24,
-    fontWeight: '600',
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    lineHeight: 32,
-  },
-  subtitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  link: {
-    lineHeight: 30,
-    fontSize: 16,
-    color: '#0a7ea4',
+  base: {
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
   },
 });

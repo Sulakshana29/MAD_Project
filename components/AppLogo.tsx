@@ -1,4 +1,4 @@
-import { Colors } from '@/constants/Colors';
+import { Colors, DesignTokens } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import React from 'react';
 import { Image, ImageSourcePropType, StyleSheet, Text, View } from 'react-native';
@@ -15,7 +15,7 @@ export default function AppLogo({ size = 'medium', showText = true, useImage = t
   const colors = Colors[colorScheme ?? 'light'];
 
   const logoSizes = {
-    small: { width: 40, height: 40, fontSize: 16, textSize: 12 },
+    small: { width: 48, height: 48, fontSize: 20, textSize: 14 },
     medium: { width: 80, height: 80, fontSize: 32, textSize: 16 },
     large: { width: 120, height: 120, fontSize: 48, textSize: 20 }
   };
@@ -27,42 +27,117 @@ export default function AppLogo({ size = 'medium', showText = true, useImage = t
   return (
     <View style={styles.container}>
       {useImage ? (
-        <Image
-          source={source}
-          style={{ width: currentSize.width, height: currentSize.height, borderRadius: 20 }}
-          resizeMode="contain"
-        />
-  ) : (
-  <View style={[
-        styles.logoIcon,
-        {
-          width: currentSize.width,
-          height: currentSize.height,
-          backgroundColor: colors.primary,
-        }
-      ]}>
-        {/* Chat bubble design */}
-        <View style={[styles.chatBubble, { backgroundColor: 'white' }]}>
-          <Text style={[styles.chatIcon, { fontSize: currentSize.fontSize * 0.3 }]}>💬</Text>
-        </View>
-        <View style={[styles.qrIcon, { backgroundColor: 'rgba(255,255,255,0.9)' }]}>
-          <Text style={[styles.qrText, { fontSize: currentSize.fontSize * 0.2 }]}>QR</Text>
-        </View>
-      </View>
-      )}
-
-      {/* App Name */}
-      {showText && (
-        <Text style={[
-          styles.appName,
+        <View style={[
+          styles.imageContainer,
           {
-            color: colors.text,
-            fontSize: currentSize.textSize,
-            marginTop: size === 'large' ? 15 : 8
+            width: currentSize.width,
+            height: currentSize.height,
+            borderRadius: DesignTokens.borderRadius.large,
+            ...DesignTokens.shadows.medium,
           }
         ]}>
-          InstantChat
-        </Text>
+          <Image
+            source={source}
+            style={[
+              styles.image,
+              {
+                width: currentSize.width,
+                height: currentSize.height,
+                borderRadius: DesignTokens.borderRadius.large,
+              }
+            ]}
+            resizeMode="cover"
+          />
+          {/* Overlay with chat icon */}
+          <View style={[
+            styles.overlay,
+            {
+              backgroundColor: colors.primary + '20',
+              borderRadius: DesignTokens.borderRadius.large,
+            }
+          ]}>
+            <Text style={[
+              styles.chatIcon,
+              { fontSize: currentSize.fontSize * 0.4 }
+            ]}>
+              💬
+            </Text>
+          </View>
+        </View>
+      ) : (
+        <View style={[
+          styles.logoIcon,
+          {
+            width: currentSize.width,
+            height: currentSize.height,
+            backgroundColor: colors.primary,
+            borderRadius: DesignTokens.borderRadius.large,
+            ...DesignTokens.shadows.medium,
+          }
+        ]}>
+          {/* Enhanced chat bubble design */}
+          <View style={[
+            styles.chatBubble,
+            {
+              backgroundColor: colors.cardBackground,
+              borderRadius: DesignTokens.borderRadius.medium,
+            }
+          ]}>
+            <Text style={[
+              styles.chatIcon,
+              { fontSize: currentSize.fontSize * 0.35 }
+            ]}>
+              💬
+            </Text>
+          </View>
+          
+          {/* QR code indicator */}
+          <View style={[
+            styles.qrIcon,
+            {
+              backgroundColor: colors.cardBackground + 'F0',
+              borderRadius: DesignTokens.borderRadius.small,
+            }
+          ]}>
+            <Text style={[
+              styles.qrText,
+              { 
+                fontSize: currentSize.fontSize * 0.25,
+                color: colors.primary,
+                fontWeight: 'bold',
+              }
+            ]}>
+              QR
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* Enhanced App Name */}
+      {showText && (
+        <View style={styles.textContainer}>
+          <Text style={[
+            styles.appName,
+            {
+              color: colors.text,
+              fontSize: currentSize.textSize,
+              fontWeight: '700',
+              marginTop: size === 'large' ? DesignTokens.spacing.md : DesignTokens.spacing.sm,
+            }
+          ]}>
+            InstantChat
+          </Text>
+          <Text style={[
+            styles.appTagline,
+            {
+              color: colors.textSecondary,
+              fontSize: currentSize.textSize * 0.7,
+              marginTop: DesignTokens.spacing.xs,
+            }
+          ]}>
+            Secure Messaging
+          </Text>
+        </View>
       )}
     </View>
   );
@@ -73,49 +148,64 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  imageContainer: {
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  image: {
+    // Image styles
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   logoIcon: {
-    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
   },
   chatBubble: {
     width: '60%',
     height: '60%',
-    borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'absolute',
     top: '20%',
     left: '20%',
+    ...DesignTokens.shadows.small,
   },
   chatIcon: {
-    color: '#007AFF',
+    textAlign: 'center',
   },
   qrIcon: {
-    position: 'absolute',
-    bottom: 5,
-    right: 5,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: '30%',
+    height: '30%',
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'absolute',
+    bottom: '15%',
+    right: '15%',
+    ...DesignTokens.shadows.small,
   },
   qrText: {
+    textAlign: 'center',
     fontWeight: 'bold',
-    color: '#007AFF',
+  },
+  textContainer: {
+    alignItems: 'center',
   },
   appName: {
-    fontWeight: 'bold',
     textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  appTagline: {
+    textAlign: 'center',
+    opacity: 0.8,
+    letterSpacing: 0.3,
   },
 });
