@@ -123,6 +123,17 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
 
   const handleIncomingMessage = (messageData: MessageEventData) => {
     if (messageData.sessionId === sessionId) {
+      // Ignore echoes of our own messages (e.g., from Firebase listeners)
+      const currentUser = MessagingService.getCurrentUserName();
+      if (currentUser && messageData.sender === currentUser) {
+        return;
+      }
+
+      // If we don't yet have a participant name saved, use the sender name
+      if (!participantName && messageData.sender) {
+        setParticipantName(messageData.sender);
+        DatabaseService.updateSessionParticipantName(sessionId, messageData.sender).catch(() => {});
+      }
       const newMessage: Message = {
         sessionId,
         content: messageData.content,
@@ -133,12 +144,6 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
       
       setMessages(prev => [...prev, newMessage]);
       
-      // Save to database
-      DatabaseService.saveMessage(newMessage);
-      
-      // Update session last message time
-      DatabaseService.updateSessionLastMessage(sessionId, messageData.timestamp);
-      
       // Scroll to bottom
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
@@ -148,6 +153,10 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
 
   const sendMessage = async () => {
     if (!inputText.trim() || isSending) return;
+    if (!MessagingService.isConnected()) {
+      Alert.alert('Not connected', 'Please wait until the chat connects.');
+      return;
+    }
     
     const messageText = inputText.trim();
     setInputText('');
@@ -327,7 +336,7 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
         ref={flatListRef}
         data={messages}
         renderItem={renderMessage}
-        keyExtractor={(item, index) => item.id?.toString() || index.toString()}
+        keyExtractor={(item, index) => `${item.sessionId}-${item.timestamp}-${item.isOwn ? 'me' : item.sender}-${item.id ?? index}`}
         style={styles.messagesList}
         contentContainerStyle={styles.messagesContent}
         onContentSizeChange={() => {

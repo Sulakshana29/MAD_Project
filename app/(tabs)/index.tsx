@@ -5,7 +5,6 @@ import QRGenerator from '@/components/QRGenerator';
 import QRScanner from '@/components/QRScanner';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Colors, DesignTokens } from '@/constants/Colors';
@@ -13,12 +12,12 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import DatabaseService from '@/services/DatabaseService';
 import MessagingService from '@/services/MessagingService';
 import React, { useEffect, useState } from 'react';
-import { Alert, StyleSheet, TouchableOpacity, View, Dimensions, ScrollView } from 'react-native';
+import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type AppState = 'menu' | 'generate' | 'scan' | 'chat' | 'history';
 
-const { width: screenWidth } = Dimensions.get('window');
+// Removed unused screenWidth
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
@@ -62,6 +61,7 @@ export default function HomeScreen() {
         createdAt: now,
         lastMessageAt: now,
       });
+      // If participant name is placeholder, it will be updated on first incoming message
     } catch (err) {
       console.warn('Failed to save chat session:', err);
     }
@@ -124,17 +124,9 @@ export default function HomeScreen() {
           <View style={[styles.container, { backgroundColor: colors.background }]}>
             {/* Enhanced Header */}
             <ThemedView style={styles.header}>
-              <AppLogo size="large" />
+              <AppLogo size="small" />
               <ThemedText 
-                type="h3" 
-                variant="primary" 
-                align="center"
-                style={styles.appTitle}
-              >
-                InstantChat
-              </ThemedText>
-              <ThemedText 
-                type="body" 
+                type="small" 
                 variant="muted" 
                 align="center"
                 style={styles.subtitle}
@@ -191,39 +183,28 @@ export default function HomeScreen() {
           style={[
             styles.backButton, 
             { 
-              borderBottomColor: colors.borderColor,
               backgroundColor: colors.cardBackground,
+              borderColor: colors.borderColor,
             }
           ]}
         >
           <TouchableOpacity 
             onPress={() => setAppState('menu')}
             style={styles.backButtonTouchable}
-            activeOpacity={0.7}
+            activeOpacity={0.8}
           >
-            <IconSymbol name="back" size={20} variant="primary" />
+            <IconSymbol name="back" size={24} variant="primary" />
             <ThemedText 
               type="bodyBold" 
               variant="primary"
               style={styles.backText}
             >
-              Back to Menu
+              Back
             </ThemedText>
           </TouchableOpacity>
         </ThemedView>
       )}
-      {appState === 'history' || appState === 'chat' ? (
-        // ChatHistory and ChatInterface have their own scrolling, don't wrap in ScrollView
-        renderContent()
-      ) : (
-        <ScrollView 
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {renderContent()}
-        </ScrollView>
-      )}
+      {renderContent()}
     </SafeAreaView>
   );
 }
@@ -281,10 +262,10 @@ const MenuCard: React.FC<MenuCardProps> = ({ title, subtitle, icon, onPress, col
         padding="large"
         margin="small"
         borderRadius="large"
-        style={[
+        style={StyleSheet.flatten([
           styles.menuCard,
           getVariantStyles(),
-        ]}
+        ])}
       >
         <View style={styles.cardContent}>
           <View style={[styles.iconContainer, { backgroundColor: getIconColor() + '20' }]}>
@@ -324,51 +305,45 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
   center: {
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: DesignTokens.spacing.lg,
   },
   header: {
-    paddingTop: DesignTokens.spacing.xl,
-    paddingHorizontal: DesignTokens.spacing.xl,
-    paddingBottom: DesignTokens.spacing.lg,
+    paddingTop: DesignTokens.spacing.lg,
+    paddingHorizontal: DesignTokens.spacing.lg,
+    paddingBottom: DesignTokens.spacing.md,
     alignItems: 'center',
   },
   appTitle: {
-    marginTop: DesignTokens.spacing.md,
-    marginBottom: DesignTokens.spacing.sm,
+    marginTop: DesignTokens.spacing.sm,
+    marginBottom: DesignTokens.spacing.xs,
   },
   subtitle: {
     textAlign: 'center',
-    paddingHorizontal: DesignTokens.spacing.lg,
+    paddingHorizontal: DesignTokens.spacing.md,
     lineHeight: 24,
   },
   menuContainer: {
     flex: 1,
-    paddingHorizontal: DesignTokens.spacing.lg,
-    paddingVertical: DesignTokens.spacing.md,
-    gap: DesignTokens.spacing.md,
-    justifyContent: 'flex-start',
+    paddingHorizontal: DesignTokens.spacing.sm,
+    paddingVertical: DesignTokens.spacing.xs,
+    gap: DesignTokens.spacing.xs,
+    justifyContent: 'center',
   },
   menuCard: {
-    minHeight: 100,
-    borderWidth: 2,
+    minHeight: 72,
+    borderWidth: 1,
   },
   cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: DesignTokens.spacing.lg,
+    gap: DesignTokens.spacing.sm,
   },
   iconContainer: {
-    width: 64,
-    height: 64,
+    width: 44,
+    height: 44,
     borderRadius: DesignTokens.borderRadius.large,
     justifyContent: 'center',
     alignItems: 'center',
@@ -384,22 +359,25 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   footer: {
-    paddingHorizontal: DesignTokens.spacing.lg,
-    paddingBottom: DesignTokens.spacing.lg,
+    paddingHorizontal: DesignTokens.spacing.md,
+    paddingBottom: DesignTokens.spacing.md,
     alignItems: 'center',
   },
   backButton: {
-    paddingHorizontal: DesignTokens.spacing.lg,
-    paddingVertical: DesignTokens.spacing.md,
-    borderBottomWidth: 1,
+    paddingHorizontal: DesignTokens.spacing.md,
+    paddingVertical: DesignTokens.spacing.sm,
+    borderWidth: 1,
+    borderRadius: DesignTokens.borderRadius.large,
+    margin: DesignTokens.spacing.sm,
+    alignSelf: 'flex-start',
   },
   backButtonTouchable: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: DesignTokens.spacing.sm,
+    gap: DesignTokens.spacing.xs,
   },
   backText: {
-    fontSize: 16,
+    fontSize: 15,
   },
   loadingText: {
     marginTop: DesignTokens.spacing.lg,

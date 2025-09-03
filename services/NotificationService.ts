@@ -3,7 +3,7 @@ import * as Notifications from 'expo-notifications';
 // Configure notification behavior
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    // shouldShowAlert is deprecated in SDK 53; rely on banner/list instead
     shouldPlaySound: true,
     shouldSetBadge: false,
     shouldShowBanner: true,

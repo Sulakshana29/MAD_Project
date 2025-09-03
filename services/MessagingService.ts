@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { Socket } from 'socket.io-client';
+import DatabaseService from './DatabaseService';
 import FirebaseService from './FirebaseService';
+import NotificationService from './NotificationService';
 
 export interface ChatConnectionInfo {
   sessionId: string;
@@ -176,6 +178,27 @@ class MessagingService {
         console.error('Error in message listener:', error);
       }
     });
+
+    // Trigger a local notification for messages received from others
+    if (message.sender !== this.currentUserName) {
+      // Persist incoming message so it appears when user opens chat later
+      DatabaseService.saveMessage({
+        sessionId: message.sessionId,
+        content: message.content,
+        sender: message.sender,
+        timestamp: message.timestamp,
+        isOwn: false,
+      }).catch(err => console.error('Error persisting incoming message:', err));
+
+      DatabaseService.updateSessionLastMessage(message.sessionId, message.timestamp)
+        .catch(err => console.error('Error updating session last message:', err));
+
+      NotificationService
+        .showIncomingMessageNotification(message.sender, message.content)
+        .catch(error => {
+          console.error('Error showing incoming message notification:', error);
+        });
+    }
   }
 
   private notifyConnectionListeners(connected: boolean): void {

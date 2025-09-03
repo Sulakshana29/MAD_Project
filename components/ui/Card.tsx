@@ -1,8 +1,8 @@
+import { ThemedView } from '@/components/ThemedView';
 import { Colors, DesignTokens } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import React from 'react';
-import { View, StyleSheet, ViewStyle } from 'react-native';
-import { ThemedView } from '@/components/ThemedView';
+import { StyleProp, StyleSheet, ViewStyle } from 'react-native';
 
 interface CardProps {
   children: React.ReactNode;
@@ -10,7 +10,7 @@ interface CardProps {
   padding?: 'none' | 'small' | 'medium' | 'large';
   margin?: 'none' | 'small' | 'medium' | 'large';
   borderRadius?: 'small' | 'medium' | 'large' | 'xlarge';
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
 }
 
 export function Card({

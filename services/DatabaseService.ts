@@ -22,13 +22,19 @@ export interface ChatSession {
 class DatabaseService {
   private db: SQLite.SQLiteDatabase | null = null;
   private isWeb = Platform.OS === 'web';
+  private isInitializedFlag: boolean = false;
+  private initializePromise: Promise<void> | null = null;
 
   async initialize() {
     try {
+      if (this.isInitializedFlag && (this.isWeb || this.db)) return;
+      if (this.initializePromise) return this.initializePromise;
+      this.initializePromise = (async () => {
       if (this.isWeb) {
         // Use AsyncStorage-based service for web
         await WebDatabaseService.initialize();
         console.log('Web Database (AsyncStorage) initialized successfully');
+        this.isInitializedFlag = true;
         return;
       }
 
@@ -58,13 +64,25 @@ class DatabaseService {
       `);
 
       console.log('SQLite Database initialized successfully');
+      this.isInitializedFlag = true;
+      })();
+      await this.initializePromise;
+      this.initializePromise = null;
     } catch (error) {
       console.error('Database initialization error:', error);
+      this.initializePromise = null;
       throw error;
     }
   }
 
+  private async ensureInitialized() {
+    if (!this.isInitializedFlag) {
+      await this.initialize();
+    }
+  }
+
   async saveMessage(message: Message): Promise<number> {
+    await this.ensureInitialized();
     if (this.isWeb) {
       return await WebDatabaseService.saveMessage(message);
     }
@@ -84,6 +102,7 @@ class DatabaseService {
   }
 
   async getMessages(sessionId: string): Promise<Message[]> {
+    await this.ensureInitialized();
     if (this.isWeb) {
       return await WebDatabaseService.getMessages(sessionId);
     }
@@ -111,6 +130,7 @@ class DatabaseService {
   }
 
   async saveChatSession(session: ChatSession): Promise<void> {
+    await this.ensureInitialized();
     if (this.isWeb) {
       return await WebDatabaseService.saveChatSession(session);
     }
@@ -129,6 +149,7 @@ class DatabaseService {
   }
 
   async getChatSessions(): Promise<ChatSession[]> {
+    await this.ensureInitialized();
     if (this.isWeb) {
       return await WebDatabaseService.getChatSessions();
     }
@@ -154,6 +175,7 @@ class DatabaseService {
   }
 
   async updateSessionLastMessage(sessionId: string, timestamp: number): Promise<void> {
+    await this.ensureInitialized();
     if (this.isWeb) {
       return await WebDatabaseService.updateSessionLastMessage(sessionId, timestamp);
     }
@@ -171,7 +193,27 @@ class DatabaseService {
     }
   }
 
+  async updateSessionParticipantName(sessionId: string, participantName: string): Promise<void> {
+    await this.ensureInitialized();
+    if (this.isWeb) {
+      return await WebDatabaseService.updateSessionParticipantName(sessionId, participantName);
+    }
+
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      await this.db.runAsync(
+        'UPDATE chat_sessions SET participantName = ? WHERE sessionId = ?',
+        [participantName, sessionId]
+      );
+    } catch (error) {
+      console.error('Error updating participant name:', error);
+      throw error;
+    }
+  }
+
   async deleteChatSession(sessionId: string): Promise<void> {
+    await this.ensureInitialized();
     if (this.isWeb) {
       return await WebDatabaseService.deleteChatSession(sessionId);
     }

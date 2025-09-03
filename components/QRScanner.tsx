@@ -144,28 +144,25 @@ export default function QRScanner({ onConnectionEstablished }: QRScannerProps) {
 
   if (hasPermission === false) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Text style={[styles.title, { color: colors.text }]}>
-          Camera Permission Required
-        </Text>
-        <Text style={[styles.text, { color: colors.text }]}>
-          This app needs access to your camera to scan QR codes.
-        </Text>
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: colors.primary }]}
-          onPress={requestPermission}
-        >
-          <Text style={styles.buttonText}>Grant Permission</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[styles.manualButton, { borderColor: colors.borderColor }]}
-          onPress={() => setShowManualInput(true)}
-        >
-          <Text style={[styles.manualButtonText, { color: colors.text }]}>
-            Enter Code Manually
+      <View style={[styles.permissionContainer, { backgroundColor: colors.background }]}> 
+        <View style={styles.permissionCard}>
+          <Text style={[styles.title, { color: colors.text }]}>Camera Permission</Text>
+          <Text style={[styles.text, { color: colors.text }]}>
+            We need access to your camera to scan QR codes.
           </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: colors.primary }]}
+            onPress={requestPermission}
+          >
+            <Text style={styles.buttonText}>Grant Permission</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.manualButton, { borderColor: colors.borderColor }]}
+            onPress={() => setShowManualInput(true)}
+          >
+            <Text style={[styles.manualButtonText, { color: colors.text }]}>Enter Code Manually</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -355,6 +352,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
+  },
+  permissionContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+  },
+  permissionCard: {
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.08)',
   },
   title: {
     fontSize: 24,
