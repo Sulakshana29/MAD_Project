@@ -16,6 +16,8 @@ export interface MessageEventData {
   sender: string;
   content: string;
   timestamp: number;
+  type?: 'user' | 'system';
+  event?: string;
 }
 
 /**
@@ -97,6 +99,16 @@ class MessagingService {
    */
   disconnect(): void {
     try {
+      // Before disconnecting locally, send a system event so peer is notified
+      if (FirebaseService.isEnabled() && this.currentSessionId && this.currentUserName) {
+        // Fire and forget
+        FirebaseService.sendSystemEvent(this.currentSessionId, 'disconnected', this.currentUserName)
+          .catch(err => console.warn('Failed to send disconnect event:', err));
+      }
+      // Persist a local session-ended flag so UI stays disabled across navigations
+      if (this.currentSessionId) {
+        AsyncStorage.setItem(`sessionEnded:${this.currentSessionId}`, '1').catch(() => {});
+      }
       if (this.socket) {
         this.socket.disconnect();
         this.socket = null;
@@ -177,6 +189,20 @@ class MessagingService {
   }
 
   /**
+   * Sends a system event (e.g., joined/disconnected) so peers can update state
+   */
+  async sendSystemEvent(event: string, actorName?: string): Promise<void> {
+    if (!this.currentSessionId) return;
+    if (!FirebaseService.isEnabled()) return;
+    try {
+      const actor = actorName || this.currentUserName || 'system';
+      await FirebaseService.sendSystemEvent(this.currentSessionId, event, actor);
+    } catch (e) {
+      console.warn('sendSystemEvent failed', e);
+    }
+  }
+
+  /**
    * Processes a message locally (used for local-only mode)
    * @param messageData - The message to process
    */
@@ -216,7 +242,7 @@ class MessagingService {
       }
     });
 
-    // Trigger a local notification for messages received from others
+    // Trigger persistence for messages received from others (including system)
     if (message.sender !== this.currentUserName) {
       // Persist incoming message so it appears when user opens chat later
       DatabaseService.saveMessage({
@@ -227,9 +253,21 @@ class MessagingService {
         isOwn: false,
       }).catch(err => console.error('Error persisting incoming message:', err));
 
-      // Notification functionality removed - no longer needed
-      // DatabaseService.updateSessionLastMessage(message.sessionId, message.timestamp)
-      //   .catch(err => console.error('Error updating session last message:', err));
+      // Update session last message time for history ordering
+      DatabaseService.updateSessionLastMessage(message.sessionId, message.timestamp)
+        .catch(err => console.error('Error updating session last message:', err));
+
+      // Ensure the chat session stores the participant name
+      if (message.type !== 'system' && message.sender && message.sender !== 'system') {
+        DatabaseService.updateSessionParticipantName(message.sessionId, message.sender)
+          .catch(() => {});
+      } else if (message.type === 'system' && message.event === 'joined') {
+        // For join events, the 'sender' carries the actor name of the joiner
+        if (message.sender && message.sender !== 'system') {
+          DatabaseService.updateSessionParticipantName(message.sessionId, message.sender)
+            .catch(() => {});
+        }
+      }
     }
   }
 

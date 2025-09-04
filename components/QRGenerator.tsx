@@ -174,8 +174,8 @@ Or scan the QR code directly!`;
               style={[styles.shareButton, { backgroundColor: colors.primary }]}
               onPress={() => {
                 if (generatedSessionId) {
-      // For the host, the participant name is initially unknown.
-      onConnectionEstablished(generatedSessionId, 'Chat Partner');
+                  // For the host, the participant name is unknown until the joiner arrives.
+                  onConnectionEstablished(generatedSessionId);
                 }
               }}
             >

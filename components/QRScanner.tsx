@@ -113,6 +113,8 @@ export default function QRScanner({ onConnectionEstablished }: QRScannerProps) {
         // Go straight to chat for a smoother UX
         setShowNameInput(false);
         onConnectionEstablished(scannedData.sessionId, scannedData.userName);
+        // Inform the host of the joiner name so their history updates immediately
+        await MessagingService.sendSystemEvent('joined', userName.trim());
       } else {
         throw new Error('Failed to establish connection');
       }
@@ -272,14 +274,14 @@ export default function QRScanner({ onConnectionEstablished }: QRScannerProps) {
         </View>
       </Modal>
 
-      {/* Name Input Modal */}
+      {/* Name Input Modal - full screen to avoid overlap with scanner */}
       <Modal
         visible={showNameInput}
-        transparent
+        transparent={false}
         animationType="slide"
         onRequestClose={() => setShowNameInput(false)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={[styles.fullscreen, { backgroundColor: colors.background }]}> 
           <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>
               Join Chat Session
@@ -461,6 +463,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  fullscreen: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   modalContent: {
     width: '80%',

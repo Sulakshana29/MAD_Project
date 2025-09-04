@@ -4,6 +4,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import DatabaseService, { Message } from '@/services/DatabaseService';
 import MessagingService, { MessageEventData } from '@/services/MessagingService';
 import QRCodeService from '@/services/QRCodeService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -26,9 +27,10 @@ import QRCode from 'react-native-qrcode-svg';
 interface ChatInterfaceProps {
   sessionId: string;
   onDisconnect: () => void;
+  onBack: () => void;
 }
 
-export default function ChatInterface({ sessionId, onDisconnect }: ChatInterfaceProps) {
+export default function ChatInterface({ sessionId, onDisconnect, onBack }: ChatInterfaceProps) {
   const { theme } = useTheme();
   const colors = Colors[theme];
   
@@ -37,6 +39,8 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [peerDisconnected, setPeerDisconnected] = useState(false);
+  const [sessionEnded, setSessionEnded] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrValue, setQrValue] = useState('');
   const [hostName, setHostName] = useState('');
@@ -76,10 +80,21 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
   const initializeChat = async () => {
     try {
       setIsLoading(true);
+      setPeerDisconnected(false);
+      setSessionEnded(false);
       
       // Load existing messages from database
       const existingMessages = await DatabaseService.getMessages(sessionId);
       setMessages(existingMessages);
+
+      // If a system disconnect already occurred earlier, keep UI disabled
+      try {
+        const flag = await AsyncStorage.getItem(`sessionEnded:${sessionId}`);
+        if (flag === '1') {
+          setPeerDisconnected(true);
+          setSessionEnded(true);
+        }
+      } catch {}
       
       // Check if messaging service is connected
       setIsConnected(MessagingService.isConnected());
@@ -135,8 +150,23 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
         return;
       }
 
-      // If we don't yet have a participant name saved, use the sender name
-      if (!participantName && messageData.sender) {
+      // Handle system events
+      if (messageData.type === 'system') {
+        if (messageData.event === 'disconnected') {
+          setPeerDisconnected(true);
+          setSessionEnded(true);
+          // Persist flag locally so it remains across navigations
+          AsyncStorage.setItem(`sessionEnded:${sessionId}`, '1').catch(() => {});
+        } else if (messageData.event === 'joined') {
+          if (messageData.sender && messageData.sender !== 'system') {
+            setParticipantName(messageData.sender);
+            DatabaseService.updateSessionParticipantName(sessionId, messageData.sender).catch(() => {});
+          }
+        }
+      }
+
+      // If name missing or still placeholder, set it from first real incoming message
+      if ((!participantName || participantName === 'Unknown') && messageData.sender && messageData.type !== 'system' && messageData.sender !== 'system') {
         setParticipantName(messageData.sender);
         DatabaseService.updateSessionParticipantName(sessionId, messageData.sender).catch(() => {});
       }
@@ -159,6 +189,10 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
 
   const sendMessage = async () => {
     if (!inputText.trim() || isSending) return;
+    if (peerDisconnected) {
+      Alert.alert('Partner disconnected', 'You cannot send messages anymore in this session.');
+      return;
+    }
     if (!MessagingService.isConnected()) {
       Alert.alert('Not connected', 'Please wait until the chat connects.');
       return;
@@ -333,39 +367,52 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
     >
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.borderColor }]}>
-        <TouchableOpacity 
-          onPress={handleDisconnect}
-          style={[styles.backPill, { borderColor: colors.borderColor, backgroundColor: colors.cardBackground }]}
-          activeOpacity={0.8}
-        >
-          <IconSymbol name="arrow.left.circle.fill" size={20} color={colors.text} />
-          <Text style={[styles.backPillText, { color: colors.text }]}>Back</Text>
-        </TouchableOpacity>
+        <View style={styles.headerLeftRow}>
+          <TouchableOpacity 
+            onPress={onBack}
+            style={[
+              styles.backPill,
+              { borderColor: colors.borderColor, backgroundColor: colors.cardBackground }
+            ]}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.backPillText, { color: colors.text }]}>Back</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={handleDisconnect}
+            disabled={!isConnected || peerDisconnected || sessionEnded}
+            style={[
+              styles.backPill,
+              { 
+                borderColor: colors.borderColor, 
+                backgroundColor: colors.cardBackground,
+                opacity: (!isConnected || peerDisconnected || sessionEnded) ? 0.5 : 1,
+              }
+            ]}
+            activeOpacity={0.8}
+          >
+            <IconSymbol name="xmark" size={20} color={colors.text} />
+            <Text style={[styles.backPillText, { color: colors.text }]}>
+              {peerDisconnected || sessionEnded ? 'Disconnected' : 'Disconnect'}
+            </Text>
+          </TouchableOpacity>
+        </View>
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
-            {participantName || 'Chat Session'}
+            {participantName && participantName !== 'Unknown' ? participantName : 'Chat Session'}
           </Text>
-          <View style={[styles.connectionRow]}>
-            <View style={[
-              styles.connectionIndicator,
-              { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }
-            ]} />
-            <Text style={[styles.headerSubtitle, { color: colors.placeholderText }]}>
-              {isConnected ? 'Connected' : 'Disconnected'}
-            </Text>
-          </View>
         </View>
-        <TouchableOpacity 
-          onPress={() => setShowQRModal(true)}
-          style={styles.qrButton}
-        >
-          <IconSymbol 
-            name="qrcode" 
-            size={22} 
-            color={colors.primary} 
-          />
-        </TouchableOpacity>
+        {/* Removed QR button */}
       </View>
+
+      {/* Peer status banner */}
+      {peerDisconnected && (
+        <View style={[styles.peerBanner, { backgroundColor: colors.cardBackground, borderColor: colors.borderColor }]}> 
+          <Text style={{ color: colors.text }}>
+            Your chat partner has disconnected. You can no longer send messages.
+          </Text>
+        </View>
+      )}
 
       {/* Messages List */}
       <FlatList
@@ -423,12 +470,12 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
             styles.sendButton,
             { 
               backgroundColor: colors.primary,
-              opacity: (!inputText.trim() || isSending) ? 0.6 : 1,
+              opacity: (!inputText.trim() || isSending || peerDisconnected) ? 0.4 : 1,
               transform: [{ scale: sendButtonScale }]
             }
           ]}
           onPress={sendMessage}
-          disabled={!inputText.trim() || isSending}
+          disabled={!inputText.trim() || isSending || peerDisconnected}
         >
           {isSending ? (
             <ActivityIndicator size="small" color="white" />
@@ -538,14 +585,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  headerLeftRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   qrButton: {
     padding: 4,
   },
-  connectionIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
+  // removed connectionIndicator styles
   messagesList: {
     flex: 1,
   },
@@ -714,5 +762,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     opacity: 0.7,
+  },
+  peerBanner: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
   },
 });

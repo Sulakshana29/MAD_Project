@@ -146,6 +146,7 @@ export function IconSymbol({
         styles.icon,
         {
           fontSize: size,
+          lineHeight: size,
           color: getIconColor(),
         },
         style,

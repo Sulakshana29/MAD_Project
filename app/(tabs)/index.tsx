@@ -1,6 +1,7 @@
 import AppLogo from '@/components/AppLogo';
 import ChatHistory from '@/components/ChatHistory';
 import ChatInterface from '@/components/ChatInterface';
+import InAppNotification from '@/components/InAppNotification';
 import QRGenerator from '@/components/QRGenerator';
 import QRScanner from '@/components/QRScanner';
 import { ThemedText } from '@/components/ThemedText';
@@ -11,8 +12,8 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Colors, DesignTokens } from '@/constants/Colors';
 import { useTheme } from '@/contexts/ThemeContext';
 import DatabaseService from '@/services/DatabaseService';
-import MessagingService from '@/services/MessagingService';
-import React, { useEffect, useState } from 'react';
+import MessagingService, { MessageEventData } from '@/services/MessagingService';
+import React, { useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -29,10 +30,41 @@ export default function HomeScreen() {
   const [appState, setAppState] = useState<AppState>('menu');
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [notification, setNotification] = useState<{ visible: boolean; title: string; message: string; sessionId?: string } | null>(null);
+  const appStateRef = useRef<AppState>(appState);
+  const currentSessionIdRef = useRef<string | null>(currentSessionId);
 
   useEffect(() => {
     initializeApp();
+    const onMessage = (msg: MessageEventData) => {
+      // Ignore own messages
+      const me = MessagingService.getCurrentUserName?.();
+      if (me && msg.sender === me) return;
+      // Show only when not already inside the same chat screen
+      const state = appStateRef.current;
+      const sid = currentSessionIdRef.current;
+      if (state !== 'chat' || (sid && sid !== msg.sessionId)) {
+        setNotification({
+          visible: true,
+          title: `${msg.sender}`,
+          message: msg.content,
+          sessionId: msg.sessionId,
+        });
+      }
+    };
+    MessagingService.addMessageListener(onMessage);
+    return () => {
+      MessagingService.removeMessageListener(onMessage);
+    };
   }, []);
+
+  useEffect(() => {
+    appStateRef.current = appState;
+  }, [appState]);
+
+  useEffect(() => {
+    currentSessionIdRef.current = currentSessionId;
+  }, [currentSessionId]);
 
   const initializeApp = async () => {
     try {
@@ -58,11 +90,11 @@ export default function HomeScreen() {
       const now = Date.now();
       await DatabaseService.saveChatSession({
         sessionId,
-        participantName: participantName || 'Chat Partner',
+        participantName: participantName || 'Unknown',
         createdAt: now,
         lastMessageAt: now,
       });
-      // If participant name is placeholder, it will be updated on first incoming message
+      // Name will be updated immediately by 'joined' event or first message
     } catch (err) {
       console.warn('Failed to save chat session:', err);
     }
@@ -110,6 +142,7 @@ export default function HomeScreen() {
           <ChatInterface 
             sessionId={currentSessionId}
             onDisconnect={handleDisconnect}
+            onBack={() => setAppState('menu')}
           />
         ) : null;
       
@@ -151,7 +184,7 @@ export default function HomeScreen() {
               <View style={styles.gridItem}>
                 <MenuCard
                 title="Scan QR Code"
-                subtitle="Scan someone's QR code to connect"
+                subtitle="Scan QR code to connect"
                 icon="camera"
                 onPress={() => setAppState('scan')}
                 variant="secondary"
@@ -190,7 +223,22 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      {appState !== 'menu' && (
+      {notification?.visible && (
+        <InAppNotification
+          visible={notification.visible}
+          title={notification.title}
+          message={notification.message}
+          onPress={() => {
+            if (notification.sessionId) {
+              setCurrentSessionId(notification.sessionId);
+              setAppState('chat');
+            }
+            setNotification(null);
+          }}
+          onClose={() => setNotification(null)}
+        />
+      )}
+      {appState !== 'menu' && appState !== 'chat' && (
         <ThemedView 
           style={[
             styles.backButton, 
@@ -205,7 +253,6 @@ export default function HomeScreen() {
             style={styles.backButtonTouchable}
             activeOpacity={0.8}
           >
-            <IconSymbol name="arrow.left.circle.fill" size={24} variant="primary" />
             <ThemedText 
               type="bodyBold" 
               variant="primary"
@@ -357,7 +404,7 @@ const styles = StyleSheet.create({
     marginBottom: DesignTokens.spacing.sm,
   },
   menuCard: {
-    minHeight: 68,
+    height: 200,
     borderWidth: 1,
   },
   cardContent: {
@@ -371,6 +418,7 @@ const styles = StyleSheet.create({
   cardBottom: {
     alignItems: 'center',
     gap: DesignTokens.spacing.xs,
+    paddingBottom: DesignTokens.spacing.md,
   },
   iconContainer: {
     width: 40,
@@ -390,6 +438,7 @@ const styles = StyleSheet.create({
   cardSubtitle: {
     lineHeight: 20,
     textAlign: 'center',
+    marginBottom: DesignTokens.spacing.md,
   },
   footer: {
     paddingHorizontal: DesignTokens.spacing.md,
