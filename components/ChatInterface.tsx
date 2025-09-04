@@ -1,23 +1,25 @@
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTheme } from '@/contexts/ThemeContext';
 import DatabaseService, { Message } from '@/services/DatabaseService';
 import MessagingService, { MessageEventData } from '@/services/MessagingService';
 import QRCodeService from '@/services/QRCodeService';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    ToastAndroid,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Animated,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  ToastAndroid,
+  TouchableOpacity,
+  Vibration,
+  View
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
@@ -27,8 +29,8 @@ interface ChatInterfaceProps {
 }
 
 export default function ChatInterface({ sessionId, onDisconnect }: ChatInterfaceProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { theme } = useTheme();
+  const colors = Colors[theme];
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -40,6 +42,10 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
   const [hostName, setHostName] = useState('');
   const [participantName, setParticipantName] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
+  
+  // Animation values for visual feedback
+  const sendButtonScale = useRef(new Animated.Value(1)).current;
+  const messageBubbleScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     initializeChat();
@@ -157,6 +163,25 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
       Alert.alert('Not connected', 'Please wait until the chat connects.');
       return;
     }
+
+    // Visual feedback: button press animation
+    Animated.sequence([
+      Animated.timing(sendButtonScale, {
+        toValue: 0.9,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(sendButtonScale, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Haptic feedback
+    if (Platform.OS === 'ios') {
+      Vibration.vibrate(50);
+    }
     
     const messageText = inputText.trim();
     setInputText('');
@@ -233,10 +258,15 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
   };
 
   const renderMessage = ({ item }: { item: Message }) => (
-    <View style={[
-      styles.messageContainer,
-      item.isOwn ? styles.ownMessage : styles.otherMessage
-    ]}>
+    <Animated.View 
+      style={[
+        styles.messageContainer,
+        item.isOwn ? styles.ownMessage : styles.otherMessage,
+        {
+          transform: [{ scale: messageBubbleScale }]
+        }
+      ]}
+    >
       {!item.isOwn && participantName && (
         <Text 
           style={[styles.senderName, { color: colors.text }]}
@@ -277,16 +307,21 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
           {formatTime(item.timestamp)}
         </Text>
       </View>
-    </View>
+    </Animated.View>
   );
 
   if (isLoading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.tint} />
-        <Text style={[styles.loadingText, { color: colors.text }]}>
-          Loading chat...
-        </Text>
+        <View style={styles.loadingContent}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.text }]}>
+            Loading chat...
+          </Text>
+          <Text style={[styles.loadingSubtext, { color: colors.placeholderText }]}>
+            Connecting to your conversation
+          </Text>
+        </View>
       </View>
     );
   }
@@ -298,37 +333,38 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
     >
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.borderColor }]}>
-        <View>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Chat Session</Text>
-          {participantName ? (
-            <Text style={[styles.headerSubtitle, { color: colors.placeholderText }]}>{participantName}</Text>
-          ) : (
-            <Text style={[styles.headerSubtitle, { color: colors.placeholderText }]}>Waiting for participant</Text>
-          )}
+        <TouchableOpacity 
+          onPress={handleDisconnect}
+          style={[styles.backPill, { borderColor: colors.borderColor, backgroundColor: colors.cardBackground }]}
+          activeOpacity={0.8}
+        >
+          <IconSymbol name="arrow.left.circle.fill" size={20} color={colors.text} />
+          <Text style={[styles.backPillText, { color: colors.text }]}>Back</Text>
+        </TouchableOpacity>
+        <View style={styles.headerCenter}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            {participantName || 'Chat Session'}
+          </Text>
+          <View style={[styles.connectionRow]}>
+            <View style={[
+              styles.connectionIndicator,
+              { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }
+            ]} />
+            <Text style={[styles.headerSubtitle, { color: colors.placeholderText }]}>
+              {isConnected ? 'Connected' : 'Disconnected'}
+            </Text>
+          </View>
         </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity 
-            onPress={() => setShowQRModal(true)}
-            style={styles.qrButton}
-          >
-            <IconSymbol 
-              name="qrcode" 
-              size={24} 
-              color={colors.primary} 
-            />
-          </TouchableOpacity>
-          <View style={[
-            styles.connectionIndicator,
-            { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }
-          ]} />
-          <TouchableOpacity onPress={handleDisconnect}>
-            <IconSymbol 
-              name="xmark.circle.fill" 
-              size={24} 
-              color={colors.text} 
-            />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity 
+          onPress={() => setShowQRModal(true)}
+          style={styles.qrButton}
+        >
+          <IconSymbol 
+            name="qrcode" 
+            size={22} 
+            color={colors.primary} 
+          />
+        </TouchableOpacity>
       </View>
 
       {/* Messages List */}
@@ -344,9 +380,20 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
         }}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={[styles.emptyText, { color: colors.text }]}>
-              No messages yet. Start the conversation!
-            </Text>
+            <View style={styles.emptyContent}>
+              <IconSymbol 
+                name="message.circle" 
+                size={80} 
+                color={colors.placeholderText} 
+                style={styles.emptyIcon}
+              />
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                Start the Conversation!
+              </Text>
+              <Text style={[styles.emptyText, { color: colors.placeholderText }]}>
+                Send your first message to begin chatting with {participantName || 'your partner'}
+              </Text>
+            </View>
           </View>
         }
       />
@@ -376,7 +423,8 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
             styles.sendButton,
             { 
               backgroundColor: colors.primary,
-              opacity: (!inputText.trim() || isSending) ? 0.6 : 1
+              opacity: (!inputText.trim() || isSending) ? 0.6 : 1,
+              transform: [{ scale: sendButtonScale }]
             }
           ]}
           onPress={sendMessage}
@@ -435,9 +483,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loadingContent: {
+    alignItems: 'center',
+    padding: 20,
+  },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
+  },
+  loadingSubtext: {
+    marginTop: 4,
+    fontSize: 14,
   },
   header: {
     flexDirection: 'row',
@@ -445,6 +501,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
+  },
+  backPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderRadius: 999,
+  },
+  backPillText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  headerCenter: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  connectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
   },
   headerTitle: {
     fontSize: 18,
@@ -479,10 +558,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 50,
   },
+  emptyContent: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyIcon: {
+    marginBottom: 15,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
   emptyText: {
     fontSize: 16,
     textAlign: 'center',
-    opacity: 0.6,
+    lineHeight: 22,
   },
   messageContainer: {
     marginVertical: 4,

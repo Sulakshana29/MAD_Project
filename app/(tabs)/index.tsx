@@ -5,10 +5,11 @@ import QRGenerator from '@/components/QRGenerator';
 import QRScanner from '@/components/QRScanner';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { Card } from '@/components/ui/Card';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Colors, DesignTokens } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTheme } from '@/contexts/ThemeContext';
 import DatabaseService from '@/services/DatabaseService';
 import MessagingService from '@/services/MessagingService';
 import React, { useEffect, useState } from 'react';
@@ -20,8 +21,8 @@ type AppState = 'menu' | 'generate' | 'scan' | 'chat' | 'history';
 // Removed unused screenWidth
 
 export default function HomeScreen() {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { theme } = useTheme();
+  const colors = Colors[theme];
   
 
   
@@ -124,7 +125,7 @@ export default function HomeScreen() {
           <View style={[styles.container, { backgroundColor: colors.background }]}>
             {/* Enhanced Header */}
             <ThemedView style={styles.header}>
-              <AppLogo size="small" />
+              <AppLogo size="medium" />
               <ThemedText 
                 type="small" 
                 variant="muted" 
@@ -137,33 +138,44 @@ export default function HomeScreen() {
 
             {/* Enhanced Menu Container */}
             <View style={styles.menuContainer}>
-              <MenuCard
+              <View style={styles.gridItem}>
+                <MenuCard
                 title="Generate QR Code"
                 subtitle="Create a QR code for others to scan"
                 icon="qrcode"
                 onPress={() => setAppState('generate')}
-                colors={colors}
                 variant="primary"
-              />
+                />
+              </View>
 
-              <MenuCard
+              <View style={styles.gridItem}>
+                <MenuCard
                 title="Scan QR Code"
                 subtitle="Scan someone's QR code to connect"
                 icon="camera"
                 onPress={() => setAppState('scan')}
-                colors={colors}
                 variant="secondary"
-              />
+                />
+              </View>
 
-              <MenuCard
+              <View style={styles.gridItemFull}>
+                <MenuCard
                 title="Chat History"
                 subtitle="View your previous conversations"
                 icon="clock"
                 onPress={() => setAppState('history')}
-                colors={colors}
                 variant="outline"
-              />
+                />
+              </View>
             </View>
+
+            {/* Spacer below grid to avoid overlap with toggle */}
+            <View style={{ height: DesignTokens.spacing.xl }} />
+
+            {/* Theme Toggle Section */}
+            <ThemedView style={styles.themeToggleContainer}>
+              <ThemeToggle size="medium" />
+            </ThemedView>
 
             {/* Footer Info */}
             <ThemedView style={styles.footer}>
@@ -193,7 +205,7 @@ export default function HomeScreen() {
             style={styles.backButtonTouchable}
             activeOpacity={0.8}
           >
-            <IconSymbol name="back" size={24} variant="primary" />
+            <IconSymbol name="arrow.left.circle.fill" size={24} variant="primary" />
             <ThemedText 
               type="bodyBold" 
               variant="primary"
@@ -214,11 +226,12 @@ interface MenuCardProps {
   subtitle: string;
   icon: string;
   onPress: () => void;
-  colors: any;
-  variant: 'primary' | 'secondary' | 'outline';
+  variant?: 'primary' | 'secondary' | 'outline';
 }
 
-const MenuCard: React.FC<MenuCardProps> = ({ title, subtitle, icon, onPress, colors, variant }) => {
+const MenuCard: React.FC<MenuCardProps> = ({ title, subtitle, icon, onPress, variant }) => {
+  const { theme } = useTheme();
+  const colors = Colors[theme];
   const getVariantStyles = () => {
     switch (variant) {
       case 'primary':
@@ -268,15 +281,16 @@ const MenuCard: React.FC<MenuCardProps> = ({ title, subtitle, icon, onPress, col
         ])}
       >
         <View style={styles.cardContent}>
-          <View style={[styles.iconContainer, { backgroundColor: getIconColor() + '20' }]}>
-            <IconSymbol 
-              name={icon} 
-              size={32} 
-              color={getIconColor()}
-            />
+          <View style={styles.cardTop}>
+            <View style={[styles.iconContainer, { backgroundColor: getIconColor() + '20' }]}>
+              <IconSymbol 
+                name={icon} 
+                size={28} 
+                color={getIconColor()}
+              />
+            </View>
           </View>
-          
-          <View style={styles.textContainer}>
+          <View style={styles.cardBottom}>
             <ThemedText 
               type="h4" 
               weight="semibold"
@@ -288,7 +302,7 @@ const MenuCard: React.FC<MenuCardProps> = ({ title, subtitle, icon, onPress, col
               {title}
             </ThemedText>
             <ThemedText 
-              type="body" 
+              type="small" 
               variant="muted"
               style={styles.cardSubtitle}
             >
@@ -315,6 +329,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: DesignTokens.spacing.lg,
     paddingBottom: DesignTokens.spacing.md,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   appTitle: {
     marginTop: DesignTokens.spacing.sm,
@@ -329,21 +344,37 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: DesignTokens.spacing.sm,
     paddingVertical: DesignTokens.spacing.xs,
-    gap: DesignTokens.spacing.xs,
-    justifyContent: 'center',
+    gap: DesignTokens.spacing.sm,
+    justifyContent: 'flex-start',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  gridItem: {
+    width: '48%',
+  },
+  gridItemFull: {
+    width: '100%',
+    marginBottom: DesignTokens.spacing.sm,
   },
   menuCard: {
-    minHeight: 72,
+    minHeight: 68,
     borderWidth: 1,
   },
   cardContent: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
     gap: DesignTokens.spacing.sm,
   },
+  cardTop: {
+    alignItems: 'center',
+  },
+  cardBottom: {
+    alignItems: 'center',
+    gap: DesignTokens.spacing.xs,
+  },
   iconContainer: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: DesignTokens.borderRadius.large,
     justifyContent: 'center',
     alignItems: 'center',
@@ -354,13 +385,22 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     marginBottom: DesignTokens.spacing.xs,
+    textAlign: 'center',
   },
   cardSubtitle: {
     lineHeight: 20,
+    textAlign: 'center',
   },
   footer: {
     paddingHorizontal: DesignTokens.spacing.md,
     paddingBottom: DesignTokens.spacing.md,
+    alignItems: 'center',
+  },
+  themeToggleContainer: {
+    paddingHorizontal: DesignTokens.spacing.md,
+    paddingVertical: DesignTokens.spacing.md,
+    marginTop: DesignTokens.spacing.xl,
+    marginBottom: DesignTokens.spacing.sm,
     alignItems: 'center',
   },
   backButton: {

@@ -1,7 +1,7 @@
 import { Colors, DesignTokens } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTheme } from '@/contexts/ThemeContext';
 import React from 'react';
-import { Text, TextProps, StyleSheet, Platform, TextStyle } from 'react-native';
+import { Platform, StyleSheet, Text, TextProps, TextStyle } from 'react-native';
 
 interface ThemedTextProps extends TextProps {
   type?: 'h1' | 'h2' | 'h3' | 'h4' | 'body' | 'bodyBold' | 'caption' | 'captionBold' | 'small';
@@ -20,8 +20,8 @@ export function ThemedText({
   children, 
   ...props 
 }: ThemedTextProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { theme } = useTheme();
+  const colors = Colors[theme];
   
   // Get typography styles with safety check
   const typographyStyle = DesignTokens.typography[type] as TextStyle;

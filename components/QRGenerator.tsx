@@ -1,5 +1,5 @@
 import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTheme } from '@/contexts/ThemeContext';
 import MessagingService from '@/services/MessagingService';
 import QRCodeService from '@/services/QRCodeService';
 import * as Clipboard from 'expo-clipboard';
@@ -21,8 +21,8 @@ interface QRGeneratorProps {
 }
 
 export default function QRGenerator({ onConnectionEstablished }: QRGeneratorProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { theme } = useTheme();
+  const colors = Colors[theme];
   
   const [userName, setUserName] = useState('');
   const [qrValue, setQrValue] = useState('');

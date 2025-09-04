@@ -1,5 +1,5 @@
 import { Colors, DesignTokens } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTheme } from '@/contexts/ThemeContext';
 import React from 'react';
 import { Image, ImageSourcePropType, StyleSheet, Text, View } from 'react-native';
 
@@ -11,8 +11,8 @@ interface AppLogoProps {
 }
 
 export default function AppLogo({ size = 'medium', showText = true, useImage = true, imageSource }: AppLogoProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { theme } = useTheme();
+  const colors = Colors[theme];
 
   const logoSizes = {
     small: { width: 48, height: 48, fontSize: 20, textSize: 14 },

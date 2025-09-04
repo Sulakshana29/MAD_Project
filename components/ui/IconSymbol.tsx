@@ -1,5 +1,5 @@
 import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTheme } from '@/contexts/ThemeContext';
 import React from 'react';
 import { StyleSheet, Text, TextProps } from 'react-native';
 
@@ -18,8 +18,8 @@ export function IconSymbol({
   style, 
   ...props 
 }: IconSymbolProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { theme } = useTheme();
+  const colors = Colors[theme];
 
   const getIconColor = () => {
     if (color) return color;

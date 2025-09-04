@@ -1,7 +1,7 @@
 import { Colors, DesignTokens } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTheme } from '@/contexts/ThemeContext';
 import React from 'react';
-import { View, ViewProps, StyleSheet } from 'react-native';
+import { StyleSheet, View, ViewProps } from 'react-native';
 
 interface ThemedViewProps extends ViewProps {
   variant?: 'default' | 'card' | 'cardSecondary' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger';
@@ -18,8 +18,8 @@ export function ThemedView({
   children, 
   ...props 
 }: ThemedViewProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { theme } = useTheme();
+  const colors = Colors[theme];
   
   // Get variant styles
   const getVariantStyles = () => {

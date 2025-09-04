@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import { Socket } from 'socket.io-client';
 import DatabaseService from './DatabaseService';
 import FirebaseService from './FirebaseService';
-import NotificationService from './NotificationService';
+// NotificationService import removed
 
 export interface ChatConnectionInfo {
   sessionId: string;
@@ -18,6 +18,15 @@ export interface MessageEventData {
   timestamp: number;
 }
 
+/**
+ * MessagingService - Handles real-time chat functionality and connection management
+ * 
+ * This service manages:
+ * - WebSocket/Firebase connections for real-time messaging
+ * - Message routing and delivery
+ * - Connection state management
+ * - Local message persistence for notifications
+ */
 class MessagingService {
   private socket: Socket | null = null;
   private currentSessionId: string | null = null;
@@ -27,9 +36,14 @@ class MessagingService {
   private isAndroid = Platform.OS === 'android';
   private firebaseSubscribedForSession: string | null = null;
 
+  /**
+   * Initializes a new chat connection with the provided connection info
+   * @param connectionInfo - Session details including sessionId, userName, and serverUrl
+   * @returns Promise<boolean> - True if connection successful, false otherwise
+   */
   async initializeConnection(connectionInfo: ChatConnectionInfo): Promise<boolean> {
     try {
-      // Android-specific initialization with timeout guard
+      // Android-specific initialization with timeout guard to prevent hanging
       if (this.isAndroid) {
         const timeoutPromise = new Promise((_, reject) => {
           setTimeout(() => reject(new Error('Connection timeout on Android')), 10000);
@@ -47,16 +61,20 @@ class MessagingService {
     }
   }
 
+  /**
+   * Establishes the actual connection and sets up Firebase listeners
+   * @param connectionInfo - Connection configuration
+   */
   private async establishConnection(connectionInfo: ChatConnectionInfo): Promise<void> {
     this.currentSessionId = connectionInfo.sessionId;
     this.currentUserName = connectionInfo.userName;
 
-    // Store connection info for reconnection
+    // Store connection info for reconnection attempts
     await AsyncStorage.setItem('currentConnection', JSON.stringify(connectionInfo));
 
     if (FirebaseService.isEnabled()) {
       await FirebaseService.connect(connectionInfo);
-      // Subscribe to Firestore messages once per session
+      // Subscribe to Firestore messages once per session to avoid duplicates
       if (this.firebaseSubscribedForSession !== connectionInfo.sessionId) {
         FirebaseService.subscribeMessages(connectionInfo.sessionId, (msg) => {
           this.notifyMessageListeners(msg);
@@ -65,7 +83,7 @@ class MessagingService {
       }
     }
 
-    // Connection success
+    // Connection success - notify listeners
     this.notifyConnectionListeners(true);
     console.log(
       'Chat connection initialized for session:',
@@ -74,6 +92,9 @@ class MessagingService {
     );
   }
 
+  /**
+   * Disconnects from the current chat session and cleans up resources
+   */
   disconnect(): void {
     try {
       if (this.socket) {
@@ -89,6 +110,7 @@ class MessagingService {
       this.currentUserName = null;
       this.notifyConnectionListeners(false);
 
+      // Clean up stored connection info
       AsyncStorage.removeItem('currentConnection').catch(error => {
         console.error('Error removing connection info:', error);
       });
@@ -99,6 +121,11 @@ class MessagingService {
     }
   }
 
+  /**
+   * Sends a message to the current chat session
+   * @param content - The message text to send
+   * @returns Promise<boolean> - True if message sent successfully
+   */
   async sendMessage(content: string): Promise<boolean> {
     if (!this.currentSessionId || !this.currentUserName) {
       console.error('No active session for sending message');
@@ -123,6 +150,7 @@ class MessagingService {
       } else {
         // Local-only fallback: deliver to this device listeners
         if (this.isAndroid) {
+          // Android-specific retry logic for reliability
           const maxRetries = 3;
           let retries = 0;
           while (retries < maxRetries) {
@@ -148,6 +176,10 @@ class MessagingService {
     }
   }
 
+  /**
+   * Processes a message locally (used for local-only mode)
+   * @param messageData - The message to process
+   */
   private async processMessage(messageData: MessageEventData): Promise<void> {
     // In a real app, emit to socket server; here we just notify local listeners
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -170,6 +202,11 @@ class MessagingService {
     this.connectionListeners = this.connectionListeners.filter(l => l !== listener);
   }
 
+  /**
+   * Notifies all message listeners with incoming message data
+   * Also handles message persistence and notifications for non-own messages
+   * @param message - The message data to broadcast
+   */
   private notifyMessageListeners(message: MessageEventData): void {
     this.messageListeners.forEach(listener => {
       try {
@@ -190,17 +227,16 @@ class MessagingService {
         isOwn: false,
       }).catch(err => console.error('Error persisting incoming message:', err));
 
-      DatabaseService.updateSessionLastMessage(message.sessionId, message.timestamp)
-        .catch(err => console.error('Error updating session last message:', err));
-
-      NotificationService
-        .showIncomingMessageNotification(message.sender, message.content)
-        .catch(error => {
-          console.error('Error showing incoming message notification:', error);
-        });
+      // Notification functionality removed - no longer needed
+      // DatabaseService.updateSessionLastMessage(message.sessionId, message.timestamp)
+      //   .catch(err => console.error('Error updating session last message:', err));
     }
   }
 
+  /**
+   * Notifies all connection state listeners
+   * @param connected - Current connection status
+   */
   private notifyConnectionListeners(connected: boolean): void {
     this.connectionListeners.forEach(listener => {
       try {

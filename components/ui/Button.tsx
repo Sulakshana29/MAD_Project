@@ -1,14 +1,14 @@
+import { ThemedText } from '@/components/ThemedText';
 import { Colors, DesignTokens } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTheme } from '@/contexts/ThemeContext';
 import React from 'react';
 import {
-  TouchableOpacity,
-  TouchableOpacityProps,
-  StyleSheet,
-  ActivityIndicator,
-  ViewStyle,
+    ActivityIndicator,
+    StyleSheet,
+    TouchableOpacity,
+    TouchableOpacityProps,
+    ViewStyle,
 } from 'react-native';
-import { ThemedText } from '@/components/ThemedText';
 
 interface ButtonProps extends TouchableOpacityProps {
   title: string;
@@ -33,8 +33,8 @@ export function Button({
   style,
   ...props
 }: ButtonProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { theme } = useTheme();
+  const colors = Colors[theme];
 
   const getVariantStyles = (): ViewStyle => {
     switch (variant) {

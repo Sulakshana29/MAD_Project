@@ -1,15 +1,15 @@
-import { Colors, DesignTokens } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
-import React, { useState } from 'react';
-import {
-  TextInput,
-  TextInputProps,
-  StyleSheet,
-  View,
-  TouchableOpacity,
-} from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { Colors, DesignTokens } from '@/constants/Colors';
+import { useTheme } from '@/contexts/ThemeContext';
+import React, { useState } from 'react';
+import {
+    StyleSheet,
+    TextInput,
+    TextInputProps,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 
 interface InputProps extends TextInputProps {
   label?: string;
@@ -32,8 +32,8 @@ export function Input({
   style,
   ...props
 }: InputProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { theme } = useTheme();
+  const colors = Colors[theme];
   const [isFocused, setIsFocused] = useState(false);
 
   const getVariantStyles = () => {

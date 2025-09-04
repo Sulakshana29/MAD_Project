@@ -1,6 +1,6 @@
 import { ThemedView } from '@/components/ThemedView';
 import { Colors, DesignTokens } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTheme } from '@/contexts/ThemeContext';
 import React from 'react';
 import { StyleProp, StyleSheet, ViewStyle } from 'react-native';
 
@@ -21,8 +21,8 @@ export function Card({
   borderRadius = 'medium',
   style,
 }: CardProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { theme } = useTheme();
+  const colors = Colors[theme];
 
   const getVariantStyles = (): ViewStyle => {
     switch (variant) {

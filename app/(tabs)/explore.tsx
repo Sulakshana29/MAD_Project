@@ -5,11 +5,16 @@ import { Collapsible } from '@/components/Collapsible';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { Colors } from '@/constants/Colors';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function AboutScreen() {
+  const { theme } = useTheme();
+  const colors = Colors[theme];
+
   return (
     <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
+      headerBackgroundColor={{ light: colors.cardBackground, dark: colors.cardBackground }}
       headerImage={
         <ThemedView style={styles.headerContainer}>
           <AppLogo size="large" showText={false} />

@@ -1,5 +1,5 @@
 import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTheme } from '@/contexts/ThemeContext';
 import MessagingService from '@/services/MessagingService';
 import QRCodeService from '@/services/QRCodeService';
 import { BarcodeScanningResult, CameraView } from 'expo-camera';
@@ -20,8 +20,8 @@ interface QRScannerProps {
 }
 
 export default function QRScanner({ onConnectionEstablished }: QRScannerProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { theme } = useTheme();
+  const colors = Colors[theme];
   
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanning, setScanning] = useState(false);

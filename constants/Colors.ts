@@ -2,97 +2,60 @@
  * InstantChat Enhanced Color Theme - Modern, accessible, and visually appealing
  */
 
-const tintColorLight = '#2563EB';  // Modern blue
-const tintColorDark = '#3B82F6';   // Bright blue
-
 export const Colors = {
   light: {
-    // Core colors
-    text: '#1F2937',           // Dark gray for excellent readability
-    textSecondary: '#6B7280',  // Secondary text
-    background: '#F9FAFB',     // Very light gray background
-    tint: tintColorLight,
-    icon: '#6B7280',           // Medium gray
-    tabIconDefault: '#9CA3AF',
-    tabIconSelected: tintColorLight,
-    
-    // Enhanced color palette
-    primary: '#2563EB',        // Modern blue
-    primaryLight: '#DBEAFE',   // Light blue background
-    secondary: '#7C3AED',      // Purple
-    secondaryLight: '#EDE9FE', // Light purple background
-    success: '#059669',        // Green
-    successLight: '#D1FAE5',   // Light green background
-    warning: '#D97706',        // Orange
-    warningLight: '#FEF3C7',   // Light yellow background
-    danger: '#DC2626',         // Red
-    dangerLight: '#FEE2E2',    // Light red background
-    
-    // Message colors
-    myMessage: '#2563EB',      // Blue for sent messages
-    otherMessage: '#F3F4F6',   // Light gray for received messages
-    myMessageText: '#FFFFFF',  // White text on blue
-    otherMessageText: '#1F2937', // Dark text on light gray
-    
-    // UI elements
-    cardBackground: '#FFFFFF',
-    cardBackgroundSecondary: '#F9FAFB',
-    borderColor: '#E5E7EB',
-    borderColorLight: '#F3F4F6',
-    placeholderText: '#9CA3AF',
-    
-    // Gradients and shadows
-    shadowColor: '#000000',
-    shadowLight: '#F3F4F6',
-    
-    // Status colors
-    online: '#10B981',
-    offline: '#9CA3AF',
-    typing: '#F59E0B',
+    text: '#1a1a1a',
+    background: '#ffffff',
+    tint: '#2f95dc',
+    tabIconDefault: '#ccc',
+    tabIconSelected: '#2f95dc',
+    primary: '#007AFF',
+    primaryLight: '#E3F2FD',
+    secondary: '#FF6B35',
+    secondaryLight: '#FFF3E0',
+    cardBackground: '#f8f9fa',
+    cardBackgroundSecondary: '#f1f3f4',
+    borderColor: '#e1e5e9',
+    borderColorLight: '#f0f0f0',
+    myMessage: '#007AFF',
+    myMessageText: '#ffffff',
+    otherMessage: '#f1f3f4',
+    otherMessageText: '#1a1a1a',
+    placeholderText: '#8e8e93',
+    textSecondary: '#6c757d',
+    success: '#34C759',
+    successLight: '#E8F5E8',
+    warning: '#FF9500',
+    warningLight: '#FFF8E1',
+    danger: '#FF3B30',
+    dangerLight: '#FFEBEE',
   },
   dark: {
-    // Core colors
-    text: '#F9FAFB',           // Light text
-    textSecondary: '#D1D5DB',  // Secondary text
-    background: '#111827',     // Dark background
-    tint: tintColorDark,
-    icon: '#9CA3AF',           // Medium gray
-    tabIconDefault: '#6B7280',
-    tabIconSelected: tintColorDark,
-    
-    // Enhanced color palette
-    primary: '#3B82F6',        // Bright blue
-    primaryLight: '#1E3A8A',   // Dark blue background
-    secondary: '#8B5CF6',      // Bright purple
-    secondaryLight: '#4C1D95', // Dark purple background
-    success: '#10B981',        // Bright green
-    successLight: '#064E3B',   // Dark green background
-    warning: '#F59E0B',        // Bright orange
-    warningLight: '#78350F',   // Dark orange background
-    danger: '#EF4444',         // Bright red
-    dangerLight: '#7F1D1D',    // Dark red background
-    
-    // Message colors
-    myMessage: '#3B82F6',      // Blue for sent messages
-    otherMessage: '#374151',   // Dark gray for received messages
-    myMessageText: '#FFFFFF',  // White text on blue
-    otherMessageText: '#F9FAFB', // Light text on dark gray
-    
-    // UI elements
-    cardBackground: '#1F2937',
-    cardBackgroundSecondary: '#111827',
-    borderColor: '#374151',
-    borderColorLight: '#4B5563',
-    placeholderText: '#9CA3AF',
-    
-    // Gradients and shadows
-    shadowColor: '#000000',
-    shadowLight: '#1F2937',
-    
-    // Status colors
-    online: '#10B981',
-    offline: '#6B7280',
-    typing: '#F59E0B',
+    text: '#ffffff',
+    background: '#000000',
+    tint: '#fff',
+    tabIconDefault: '#ccc',
+    tabIconSelected: '#fff',
+    primary: '#0A84FF',
+    primaryLight: '#1C1C1E',
+    secondary: '#FF9F0A',
+    secondaryLight: '#2C2C2E',
+    cardBackground: '#1c1c1e',
+    cardBackgroundSecondary: '#2c2c2e',
+    borderColor: '#38383a',
+    borderColorLight: '#48484a',
+    myMessage: '#0A84FF',
+    myMessageText: '#ffffff',
+    otherMessage: '#2c2c2e',
+    otherMessageText: '#ffffff',
+    placeholderText: '#8e8e93',
+    textSecondary: '#8e8e93',
+    success: '#30D158',
+    successLight: '#1C1C1E',
+    warning: '#FF9F0A',
+    warningLight: '#2C2C2E',
+    danger: '#FF453A',
+    dangerLight: '#1C1C1E',
   },
 };
 
