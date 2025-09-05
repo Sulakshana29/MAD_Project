@@ -88,13 +88,20 @@ export default function HomeScreen() {
     // Save chat session so it appears in history
     try {
       const now = Date.now();
+      const currentUserName = MessagingService.getCurrentUserName();
+      
+      // Save session with both participant names
       await DatabaseService.saveChatSession({
         sessionId,
-        participantName: participantName || 'Unknown',
+        participantName: participantName || currentUserName || 'Unknown',
         createdAt: now,
         lastMessageAt: now,
       });
-      // Name will be updated immediately by 'joined' event or first message
+      
+      // Also save the current user's name to the session
+      if (currentUserName) {
+        await DatabaseService.updateSessionParticipantName(sessionId, currentUserName);
+      }
     } catch (err) {
       console.warn('Failed to save chat session:', err);
     }

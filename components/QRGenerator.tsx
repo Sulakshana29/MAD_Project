@@ -110,8 +110,28 @@ Or scan the QR code directly!`;
   const resetQRCode = () => {
     setQrValue('');
     setIsWaitingForConnection(false);
-  setGeneratedSessionId(null);
+    setGeneratedSessionId(null);
     MessagingService.disconnect();
+  };
+
+  const handleDisconnect = () => {
+    Alert.alert(
+      'Disconnect',
+      'Are you sure you want to disconnect from this chat session?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Disconnect',
+          style: 'destructive',
+          onPress: () => {
+            MessagingService.disconnect();
+            setQrValue('');
+            setIsWaitingForConnection(false);
+            setGeneratedSessionId(null);
+          }
+        }
+      ]
+    );
   };
 
   return (
@@ -201,6 +221,13 @@ Or scan the QR code directly!`;
               onPress={resetQRCode}
             >
               <Text style={[styles.resetButtonText, { color: colors.text }]}>🔄 Generate New</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.disconnectButton, { borderColor: colors.danger }]}
+              onPress={handleDisconnect}
+            >
+              <Text style={[styles.disconnectButtonText, { color: colors.danger }]}>❌ Disconnect</Text>
             </TouchableOpacity>
           </View>
 
@@ -316,6 +343,17 @@ const styles = StyleSheet.create({
   resetButtonText: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  disconnectButton: {
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    justifyContent: 'center',
+  },
+  disconnectButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   copyText: {
     fontSize: 16,

@@ -7,20 +7,20 @@ import QRCodeService from '@/services/QRCodeService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  FlatList,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  ToastAndroid,
-  TouchableOpacity,
-  Vibration,
-  View
+    ActivityIndicator,
+    Alert,
+    Animated,
+    FlatList,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    ToastAndroid,
+    TouchableOpacity,
+    Vibration,
+    View
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
@@ -106,9 +106,23 @@ export default function ChatInterface({ sessionId, onDisconnect, onBack }: ChatI
       try {
         const sessions = await DatabaseService.getChatSessions();
         const s = sessions.find(ss => ss.sessionId === sessionId);
-        if (s) setParticipantName(s.participantName || null);
+        if (s) {
+          setParticipantName(s.participantName || null);
+        } else {
+          // If no session found, create one with current user's name
+          const currentUserName = MessagingService.getCurrentUserName();
+          if (currentUserName) {
+            await DatabaseService.saveChatSession({
+              sessionId,
+              participantName: currentUserName,
+              createdAt: Date.now(),
+              lastMessageAt: Date.now(),
+            });
+            setParticipantName(currentUserName);
+          }
+        }
       } catch (e) {
-        // ignore
+        console.warn('Error loading/saving session info:', e);
       }
       
       // Scroll to bottom
@@ -223,10 +237,11 @@ export default function ChatInterface({ sessionId, onDisconnect, onBack }: ChatI
     
     try {
       // Create message object
+      const currentUserName = MessagingService.getCurrentUserName() || 'me';
       const message: Message = {
         sessionId,
         content: messageText,
-        sender: 'me',
+        sender: currentUserName,
         timestamp: Date.now(),
         isOwn: true,
       };

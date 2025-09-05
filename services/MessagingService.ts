@@ -45,6 +45,7 @@ class MessagingService {
    */
   async initializeConnection(connectionInfo: ChatConnectionInfo): Promise<boolean> {
     try {
+      console.log('Initializing connection with:', connectionInfo);
       // Android-specific initialization with timeout guard to prevent hanging
       if (this.isAndroid) {
         const timeoutPromise = new Promise((_, reject) => {
@@ -55,6 +56,7 @@ class MessagingService {
       } else {
         await this.establishConnection(connectionInfo);
       }
+      console.log('Connection initialized successfully');
       return true;
     } catch (error) {
       console.error('Connection initialization error:', error);
@@ -68,6 +70,7 @@ class MessagingService {
    * @param connectionInfo - Connection configuration
    */
   private async establishConnection(connectionInfo: ChatConnectionInfo): Promise<void> {
+    console.log('Establishing connection...');
     this.currentSessionId = connectionInfo.sessionId;
     this.currentUserName = connectionInfo.userName;
 
@@ -75,14 +78,19 @@ class MessagingService {
     await AsyncStorage.setItem('currentConnection', JSON.stringify(connectionInfo));
 
     if (FirebaseService.isEnabled()) {
+      console.log('Firebase is enabled, connecting...');
       await FirebaseService.connect(connectionInfo);
       // Subscribe to Firestore messages once per session to avoid duplicates
       if (this.firebaseSubscribedForSession !== connectionInfo.sessionId) {
+        console.log('Subscribing to Firebase messages for session:', connectionInfo.sessionId);
         FirebaseService.subscribeMessages(connectionInfo.sessionId, (msg) => {
+          console.log('Received Firebase message:', msg);
           this.notifyMessageListeners(msg);
         });
         this.firebaseSubscribedForSession = connectionInfo.sessionId;
       }
+    } else {
+      console.log('Firebase is not enabled, using local-only mode');
     }
 
     // Connection success - notify listeners
@@ -105,6 +113,13 @@ class MessagingService {
         FirebaseService.sendSystemEvent(this.currentSessionId, 'disconnected', this.currentUserName)
           .catch(err => console.warn('Failed to send disconnect event:', err));
       }
+      
+      // Save the current user name to the session before disconnecting
+      if (this.currentSessionId && this.currentUserName) {
+        DatabaseService.updateSessionParticipantName(this.currentSessionId, this.currentUserName)
+          .catch(err => console.warn('Failed to save user name on disconnect:', err));
+      }
+      
       // Persist a local session-ended flag so UI stays disabled across navigations
       if (this.currentSessionId) {
         AsyncStorage.setItem(`sessionEnded:${this.currentSessionId}`, '1').catch(() => {});
@@ -152,14 +167,19 @@ class MessagingService {
         timestamp: Date.now(),
       };
 
+      console.log('Sending message:', messageData);
+
       if (FirebaseService.isEnabled()) {
+        console.log('Sending via Firebase...');
         await FirebaseService.sendMessage(
           messageData.sessionId,
           messageData.sender,
           messageData.content
         );
+        console.log('Message sent via Firebase successfully');
         // Delivery handled by Firestore onSnapshot on each device
       } else {
+        console.log('Sending via local-only mode...');
         // Local-only fallback: deliver to this device listeners
         if (this.isAndroid) {
           // Android-specific retry logic for reliability
@@ -179,6 +199,7 @@ class MessagingService {
         } else {
           await this.processMessage(messageData);
         }
+        console.log('Message sent via local mode successfully');
       }
 
       return true;
