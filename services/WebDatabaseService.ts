@@ -136,6 +136,21 @@ class WebDatabaseService {
     }
   }
 
+  async updateSessionParticipantName(sessionId: string, participantName: string): Promise<void> {
+    if (!this.isInitialized) throw new Error('Database not initialized');
+    try {
+      const sessions = await this.getStoredData<ChatSession>('chat_sessions');
+      const sessionIndex = sessions.findIndex(s => s.sessionId === sessionId);
+      if (sessionIndex >= 0) {
+        sessions[sessionIndex].participantName = participantName;
+        await this.setStoredData('chat_sessions', sessions);
+      }
+    } catch (error) {
+      console.error('Error updating participant name:', error);
+      throw error;
+    }
+  }
+
   async deleteChatSession(sessionId: string): Promise<void> {
     if (!this.isInitialized) throw new Error('Database not initialized');
     

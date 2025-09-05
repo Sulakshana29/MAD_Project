@@ -13,7 +13,7 @@ InstantChat allows strangers to quickly start a mobile chat session by scanning 
 - **Database:** SQLite (local storage)
 - **QR Code:** react-native-qrcode-svg, expo-barcode-scanner
 - **Camera:** expo-camera
-- **Notifications:** expo-notifications
+- **Theme System:** Custom light/dark mode with theme toggle
 - **Navigation:** expo-router
 - **Compatibility:** Android 9+ / iOS 13+
 
@@ -35,7 +35,7 @@ InstantChat allows strangers to quickly start a mobile chat session by scanning 
 
 ### Versatility & Robustness (10 Marks)
 - ✅ **Toast Notifications:** Informative messages for user actions
-- ✅ **Push Notifications:** Local notifications for incoming messages
+- ✅ **Theme Toggle:** Light, dark, and system theme modes
 - ✅ **Exception Handling:** Graceful error handling with user-friendly messages
 - ✅ **Permission Management:** Camera and notification permissions
 - ✅ **Dark/Light Mode:** Automatic theme switching support
@@ -135,8 +135,7 @@ InstantChatApp/
 ├── services/                     # Business logic
 │   ├── DatabaseService.ts       # SQLite operations
 │   ├── MessagingService.ts      # Chat messaging
-│   ├── QRCodeService.ts         # QR code utilities
-│   └── NotificationService.ts   # Push notifications
+│   └── QRCodeService.ts         # QR code utilities
 ├── constants/                    # App constants
 ├── hooks/                        # Custom hooks
 └── assets/                       # Images and fonts
@@ -147,7 +146,6 @@ InstantChatApp/
 ### Permissions Required
 
 - **Camera:** For QR code scanning
-- **Notifications:** For message alerts
 
 ### Database Schema
 

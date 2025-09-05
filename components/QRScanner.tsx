@@ -1,5 +1,5 @@
 import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTheme } from '@/contexts/ThemeContext';
 import MessagingService from '@/services/MessagingService';
 import QRCodeService from '@/services/QRCodeService';
 import { BarcodeScanningResult, CameraView } from 'expo-camera';
@@ -20,8 +20,8 @@ interface QRScannerProps {
 }
 
 export default function QRScanner({ onConnectionEstablished }: QRScannerProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { theme } = useTheme();
+  const colors = Colors[theme];
   
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -113,6 +113,8 @@ export default function QRScanner({ onConnectionEstablished }: QRScannerProps) {
         // Go straight to chat for a smoother UX
         setShowNameInput(false);
         onConnectionEstablished(scannedData.sessionId, scannedData.userName);
+        // Inform the host of the joiner name so their history updates immediately
+        await MessagingService.sendSystemEvent('joined', userName.trim());
       } else {
         throw new Error('Failed to establish connection');
       }
@@ -144,28 +146,25 @@ export default function QRScanner({ onConnectionEstablished }: QRScannerProps) {
 
   if (hasPermission === false) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Text style={[styles.title, { color: colors.text }]}>
-          Camera Permission Required
-        </Text>
-        <Text style={[styles.text, { color: colors.text }]}>
-          This app needs access to your camera to scan QR codes.
-        </Text>
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: colors.primary }]}
-          onPress={requestPermission}
-        >
-          <Text style={styles.buttonText}>Grant Permission</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[styles.manualButton, { borderColor: colors.borderColor }]}
-          onPress={() => setShowManualInput(true)}
-        >
-          <Text style={[styles.manualButtonText, { color: colors.text }]}>
-            Enter Code Manually
+      <View style={[styles.permissionContainer, { backgroundColor: colors.background }]}> 
+        <View style={styles.permissionCard}>
+          <Text style={[styles.title, { color: colors.text }]}>Camera Permission</Text>
+          <Text style={[styles.text, { color: colors.text }]}>
+            We need access to your camera to scan QR codes.
           </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: colors.primary }]}
+            onPress={requestPermission}
+          >
+            <Text style={styles.buttonText}>Grant Permission</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.manualButton, { borderColor: colors.borderColor }]}
+            onPress={() => setShowManualInput(true)}
+          >
+            <Text style={[styles.manualButtonText, { color: colors.text }]}>Enter Code Manually</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -275,14 +274,14 @@ export default function QRScanner({ onConnectionEstablished }: QRScannerProps) {
         </View>
       </Modal>
 
-      {/* Name Input Modal */}
+      {/* Name Input Modal - full screen to avoid overlap with scanner */}
       <Modal
         visible={showNameInput}
-        transparent
+        transparent={false}
         animationType="slide"
         onRequestClose={() => setShowNameInput(false)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={[styles.fullscreen, { backgroundColor: colors.background }]}> 
           <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>
               Join Chat Session
@@ -355,6 +354,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
+  },
+  permissionContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+  },
+  permissionCard: {
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.08)',
   },
   title: {
     fontSize: 24,
@@ -450,6 +463,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  fullscreen: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   modalContent: {
     width: '80%',

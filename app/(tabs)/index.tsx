@@ -1,31 +1,70 @@
 import AppLogo from '@/components/AppLogo';
 import ChatHistory from '@/components/ChatHistory';
 import ChatInterface from '@/components/ChatInterface';
+import InAppNotification from '@/components/InAppNotification';
 import QRGenerator from '@/components/QRGenerator';
 import QRScanner from '@/components/QRScanner';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { Card } from '@/components/ui/Card';
+import { IconSymbol } from '@/components/ui/IconSymbol';
+import { Colors, DesignTokens } from '@/constants/Colors';
+import { useTheme } from '@/contexts/ThemeContext';
 import DatabaseService from '@/services/DatabaseService';
-import MessagingService from '@/services/MessagingService';
-import React, { useEffect, useState } from 'react';
+import MessagingService, { MessageEventData } from '@/services/MessagingService';
+import React, { useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type AppState = 'menu' | 'generate' | 'scan' | 'chat' | 'history';
 
+// Removed unused screenWidth
+
 export default function HomeScreen() {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { theme } = useTheme();
+  const colors = Colors[theme];
+  
+
   
   const [appState, setAppState] = useState<AppState>('menu');
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [notification, setNotification] = useState<{ visible: boolean; title: string; message: string; sessionId?: string } | null>(null);
+  const appStateRef = useRef<AppState>(appState);
+  const currentSessionIdRef = useRef<string | null>(currentSessionId);
 
   useEffect(() => {
     initializeApp();
+    const onMessage = (msg: MessageEventData) => {
+      // Ignore own messages
+      const me = MessagingService.getCurrentUserName?.();
+      if (me && msg.sender === me) return;
+      // Show only when not already inside the same chat screen
+      const state = appStateRef.current;
+      const sid = currentSessionIdRef.current;
+      if (state !== 'chat' || (sid && sid !== msg.sessionId)) {
+        setNotification({
+          visible: true,
+          title: `${msg.sender}`,
+          message: msg.content,
+          sessionId: msg.sessionId,
+        });
+      }
+    };
+    MessagingService.addMessageListener(onMessage);
+    return () => {
+      MessagingService.removeMessageListener(onMessage);
+    };
   }, []);
+
+  useEffect(() => {
+    appStateRef.current = appState;
+  }, [appState]);
+
+  useEffect(() => {
+    currentSessionIdRef.current = currentSessionId;
+  }, [currentSessionId]);
 
   const initializeApp = async () => {
     try {
@@ -49,12 +88,20 @@ export default function HomeScreen() {
     // Save chat session so it appears in history
     try {
       const now = Date.now();
+      const currentUserName = MessagingService.getCurrentUserName();
+      
+      // Save session with both participant names
       await DatabaseService.saveChatSession({
         sessionId,
-        participantName: participantName || 'Chat Partner',
+        participantName: participantName || currentUserName || 'Unknown',
         createdAt: now,
         lastMessageAt: now,
       });
+      
+      // Also save the current user's name to the session
+      if (currentUserName) {
+        await DatabaseService.updateSessionParticipantName(sessionId, currentUserName);
+      }
     } catch (err) {
       console.warn('Failed to save chat session:', err);
     }
@@ -72,9 +119,11 @@ export default function HomeScreen() {
 
   if (!isInitialized) {
     return (
-      <ThemedView style={[styles.container, styles.center]}>
+      <ThemedView style={[styles.container, styles.center, { backgroundColor: colors.background }]}>
         <AppLogo size="large" />
-        <ThemedText>Initializing...</ThemedText>
+        <ThemedText type="body" variant="muted" style={styles.loadingText}>
+          Initializing...
+        </ThemedText>
       </ThemedView>
     );
   }
@@ -100,6 +149,7 @@ export default function HomeScreen() {
           <ChatInterface 
             sessionId={currentSessionId}
             onDisconnect={handleDisconnect}
+            onBack={() => setAppState('menu')}
           />
         ) : null;
       
@@ -113,38 +163,66 @@ export default function HomeScreen() {
       default:
         return (
           <View style={[styles.container, { backgroundColor: colors.background }]}>
+            {/* Enhanced Header */}
             <ThemedView style={styles.header}>
-              <AppLogo size="large" />
-              <ThemedText style={[styles.subtitle, { color: colors.text, marginTop: 20 }]}>
+              <AppLogo size="medium" />
+              <ThemedText 
+                type="small" 
+                variant="muted" 
+                align="center"
+                style={styles.subtitle}
+              >
                 Connect instantly with QR codes
               </ThemedText>
             </ThemedView>
 
+            {/* Enhanced Menu Container */}
             <View style={styles.menuContainer}>
-              <MenuButton
+              <View style={styles.gridItem}>
+                <MenuCard
                 title="Generate QR Code"
                 subtitle="Create a QR code for others to scan"
                 icon="qrcode"
                 onPress={() => setAppState('generate')}
-                colors={colors}
-              />
+                variant="primary"
+                />
+              </View>
 
-              <MenuButton
+              <View style={styles.gridItem}>
+                <MenuCard
                 title="Scan QR Code"
-                subtitle="Scan someone's QR code to connect"
+                subtitle="Scan QR code to connect"
                 icon="camera"
                 onPress={() => setAppState('scan')}
-                colors={colors}
-              />
+                variant="secondary"
+                />
+              </View>
 
-              <MenuButton
+              <View style={styles.gridItemFull}>
+                <MenuCard
                 title="Chat History"
                 subtitle="View your previous conversations"
                 icon="clock"
                 onPress={() => setAppState('history')}
-                colors={colors}
-              />
+                variant="outline"
+                />
+              </View>
             </View>
+
+            {/* Spacer below grid to avoid overlap with toggle */}
+            <View style={{ height: DesignTokens.spacing.xl }} />
+
+            {/* Theme Toggle Section */}
+            <ThemedView style={styles.themeToggleContainer}>
+              <ThemeToggle size="medium" />
+            </ThemedView>
+
+            {/* Footer Info */}
+            <ThemedView style={styles.footer}>
+              <ThemedText type="small" variant="muted" align="center">
+                Secure • Fast • Private
+              </ThemedText>
+            </ThemedView>
           </View>
         );
     }
@@ -152,51 +230,144 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      {appState !== 'menu' && (
-        <View style={[styles.backButton, { borderBottomColor: colors.text + '20' }]}>
-          <TouchableOpacity onPress={() => setAppState('menu')}>
+      {notification?.visible && (
+        <InAppNotification
+          visible={notification.visible}
+          title={notification.title}
+          message={notification.message}
+          onPress={() => {
+            if (notification.sessionId) {
+              setCurrentSessionId(notification.sessionId);
+              setAppState('chat');
+            }
+            setNotification(null);
+          }}
+          onClose={() => setNotification(null)}
+        />
+      )}
+      {appState !== 'menu' && appState !== 'chat' && (
+        <ThemedView 
+          style={[
+            styles.backButton, 
+            { 
+              backgroundColor: colors.cardBackground,
+              borderColor: colors.borderColor,
+            }
+          ]}
+        >
+          <TouchableOpacity 
+            onPress={() => setAppState('menu')}
+            style={styles.backButtonTouchable}
+            activeOpacity={0.8}
+          >
             <ThemedText 
-              style={[styles.backText, { color: colors.tint }]}
+              type="bodyBold" 
+              variant="primary"
+              style={styles.backText}
             >
-              ← Back to Menu
+              Back
             </ThemedText>
           </TouchableOpacity>
-        </View>
+        </ThemedView>
       )}
       {renderContent()}
     </SafeAreaView>
   );
 }
 
-interface MenuButtonProps {
+interface MenuCardProps {
   title: string;
   subtitle: string;
   icon: string;
   onPress: () => void;
-  colors: any;
+  variant?: 'primary' | 'secondary' | 'outline';
 }
 
-const MenuButton: React.FC<MenuButtonProps> = ({ title, subtitle, onPress, colors }) => (
-  <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-    <ThemedView 
-      style={[
-        styles.menuButton, 
-        { 
-          backgroundColor: colors.cardBackground || colors.background,
-          borderColor: colors.borderColor || colors.primary,
-          shadowColor: colors.primary,
-        }
-      ]}
-    >
-      <ThemedText type="subtitle" style={[styles.buttonTitle, { color: colors.primary }]}>
-        {title}
-      </ThemedText>
-      <ThemedText style={[styles.buttonSubtitle, { color: colors.placeholderText || colors.text }]}>
-        {subtitle}
-      </ThemedText>
-    </ThemedView>
-  </TouchableOpacity>
-);
+const MenuCard: React.FC<MenuCardProps> = ({ title, subtitle, icon, onPress, variant }) => {
+  const { theme } = useTheme();
+  const colors = Colors[theme];
+  const getVariantStyles = () => {
+    switch (variant) {
+      case 'primary':
+        return {
+          backgroundColor: colors.primaryLight,
+          borderColor: colors.primary,
+        };
+      case 'secondary':
+        return {
+          backgroundColor: colors.secondaryLight,
+          borderColor: colors.secondary,
+        };
+      case 'outline':
+        return {
+          backgroundColor: colors.cardBackground,
+          borderColor: colors.borderColor,
+        };
+      default:
+        return {
+          backgroundColor: colors.cardBackground,
+          borderColor: colors.borderColor,
+        };
+    }
+  };
+
+  const getIconColor = () => {
+    switch (variant) {
+      case 'primary':
+        return colors.primary;
+      case 'secondary':
+        return colors.secondary;
+      default:
+        return colors.text;
+    }
+  };
+
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
+      <Card
+        variant="elevated"
+        padding="large"
+        margin="small"
+        borderRadius="large"
+        style={StyleSheet.flatten([
+          styles.menuCard,
+          getVariantStyles(),
+        ])}
+      >
+        <View style={styles.cardContent}>
+          <View style={styles.cardTop}>
+            <View style={[styles.iconContainer, { backgroundColor: getIconColor() + '20' }]}>
+              <IconSymbol 
+                name={icon} 
+                size={28} 
+                color={getIconColor()}
+              />
+            </View>
+          </View>
+          <View style={styles.cardBottom}>
+            <ThemedText 
+              type="h4" 
+              weight="semibold"
+              style={[
+                styles.cardTitle, 
+                { color: getIconColor() }
+              ]}
+            >
+              {title}
+            </ThemedText>
+            <ThemedText 
+              type="small" 
+              variant="muted"
+              style={styles.cardSubtitle}
+            >
+              {subtitle}
+            </ThemedText>
+          </View>
+        </View>
+      </Card>
+    </TouchableOpacity>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -205,62 +376,106 @@ const styles = StyleSheet.create({
   center: {
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20, // Add horizontal padding for phone edges
+    paddingHorizontal: DesignTokens.spacing.lg,
   },
   header: {
-    paddingTop: 20,        // Reduced top padding 
-    paddingHorizontal: 30, // Keep horizontal padding
-    paddingBottom: 20,     // Add bottom padding
-    alignItems: 'center',  // Center align - change to 'flex-start' for left align
+    paddingTop: DesignTokens.spacing.lg,
+    paddingHorizontal: DesignTokens.spacing.lg,
+    paddingBottom: DesignTokens.spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 10,
+  appTitle: {
+    marginTop: DesignTokens.spacing.sm,
+    marginBottom: DesignTokens.spacing.xs,
   },
   subtitle: {
-    fontSize: 18,
     textAlign: 'center',
-    opacity: 0.8,
-    paddingHorizontal: 20, // Add padding for better text wrapping
+    paddingHorizontal: DesignTokens.spacing.md,
+    lineHeight: 24,
   },
   menuContainer: {
     flex: 1,
-    paddingHorizontal: 20, // Side margins
-    paddingVertical: 10,   // Top/bottom spacing
-    gap: 15,              // Reduced gap for better fit
-    justifyContent: 'flex-start', // Align buttons to top
+    paddingHorizontal: DesignTokens.spacing.sm,
+    paddingVertical: DesignTokens.spacing.xs,
+    gap: DesignTokens.spacing.sm,
+    justifyContent: 'flex-start',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
   },
-  menuButton: {
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 2,
-    shadowColor: '#007AFF',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
-    marginVertical: 5,    // Reduced margin
+  gridItem: {
+    width: '48%',
   },
-  buttonTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 5,
+  gridItemFull: {
+    width: '100%',
+    marginBottom: DesignTokens.spacing.sm,
   },
-  buttonSubtitle: {
-    fontSize: 14,
+  menuCard: {
+    height: 200,
+    borderWidth: 1,
+  },
+  cardContent: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: DesignTokens.spacing.sm,
+  },
+  cardTop: {
+    alignItems: 'center',
+  },
+  cardBottom: {
+    alignItems: 'center',
+    gap: DesignTokens.spacing.xs,
+    paddingBottom: DesignTokens.spacing.md,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: DesignTokens.borderRadius.large,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  textContainer: {
+    flex: 1,
+    gap: DesignTokens.spacing.xs,
+  },
+  cardTitle: {
+    marginBottom: DesignTokens.spacing.xs,
+    textAlign: 'center',
+  },
+  cardSubtitle: {
     lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: DesignTokens.spacing.md,
+  },
+  footer: {
+    paddingHorizontal: DesignTokens.spacing.md,
+    paddingBottom: DesignTokens.spacing.md,
+    alignItems: 'center',
+  },
+  themeToggleContainer: {
+    paddingHorizontal: DesignTokens.spacing.md,
+    paddingVertical: DesignTokens.spacing.md,
+    marginTop: DesignTokens.spacing.xl,
+    marginBottom: DesignTokens.spacing.sm,
+    alignItems: 'center',
   },
   backButton: {
-    paddingHorizontal: 20, // Better horizontal padding
-    paddingVertical: 12,   // Vertical padding
-    borderBottomWidth: 1,
+    paddingHorizontal: DesignTokens.spacing.md,
+    paddingVertical: DesignTokens.spacing.sm,
+    borderWidth: 1,
+    borderRadius: DesignTokens.borderRadius.large,
+    margin: DesignTokens.spacing.sm,
+    alignSelf: 'flex-start',
+  },
+  backButtonTouchable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: DesignTokens.spacing.xs,
   },
   backText: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 15,
+  },
+  loadingText: {
+    marginTop: DesignTokens.spacing.lg,
   },
 });

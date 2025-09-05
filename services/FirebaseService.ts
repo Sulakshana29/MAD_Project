@@ -71,6 +71,8 @@ class FirebaseService {
               sender: d.sender,
               content: d.content,
               timestamp: typeof d.timestamp === 'number' ? d.timestamp : Date.now(),
+              type: d.type || 'user',
+              event: d.event,
             };
             onMessage(msg);
           }
@@ -86,6 +88,25 @@ class FirebaseService {
       sender,
       content,
       timestamp: Date.now(),
+      type: 'user',
+    });
+  }
+
+  async sendSystemEvent(sessionId: string, event: string, actor: string): Promise<void> {
+    if (!this.db) throw new Error('Firebase not enabled');
+    const colRef = collection(this.db, 'sessions', sessionId, 'messages');
+    let content = `${actor}: ${event}`;
+    if (event === 'disconnected') {
+      content = `${actor} has disconnected. You can no longer send messages.`;
+    } else if (event === 'joined') {
+      content = `${actor} joined the chat.`;
+    }
+    await addDoc(colRef, {
+      sender: 'system',
+      content,
+      timestamp: Date.now(),
+      type: 'system',
+      event,
     });
   }
 

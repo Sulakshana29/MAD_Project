@@ -1,15 +1,15 @@
 import type { PropsWithChildren, ReactElement } from 'react';
-import { StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, {
-  interpolate,
-  useAnimatedRef,
-  useAnimatedStyle,
-  useScrollViewOffset,
+    interpolate,
+    useAnimatedRef,
+    useAnimatedStyle,
+    useScrollViewOffset,
 } from 'react-native-reanimated';
 
 import { ThemedView } from '@/components/ThemedView';
 import { useBottomTabOverflow } from '@/components/ui/TabBarBackground';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 const HEADER_HEIGHT = 250;
 
@@ -23,10 +23,35 @@ export default function ParallaxScrollView({
   headerImage,
   headerBackgroundColor,
 }: Props) {
-  const colorScheme = useColorScheme() ?? 'light';
+  const { theme } = useTheme();
+  const bottom = useBottomTabOverflow();
+  
+  // Check if Reanimated is available
+  const isReanimatedAvailable = typeof useAnimatedRef === 'function';
+  
+  if (!isReanimatedAvailable) {
+    // Fallback to regular ScrollView when Reanimated is not available
+    return (
+      <ThemedView style={styles.container}>
+        <ScrollView
+          scrollEventThrottle={16}
+          scrollIndicatorInsets={{ bottom }}
+          contentContainerStyle={{ paddingBottom: bottom }}>
+          <View
+            style={[
+              styles.header,
+              { backgroundColor: headerBackgroundColor[theme] },
+            ]}>
+            {headerImage}
+          </View>
+          <ThemedView style={styles.content}>{children}</ThemedView>
+        </ScrollView>
+      </ThemedView>
+    );
+  }
+
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const scrollOffset = useScrollViewOffset(scrollRef);
-  const bottom = useBottomTabOverflow();
   const headerAnimatedStyle = useAnimatedStyle(() => {
     return {
       transform: [
@@ -54,7 +79,7 @@ export default function ParallaxScrollView({
         <Animated.View
           style={[
             styles.header,
-            { backgroundColor: headerBackgroundColor[colorScheme] },
+            { backgroundColor: headerBackgroundColor[theme] },
             headerAnimatedStyle,
           ]}>
           {headerImage}

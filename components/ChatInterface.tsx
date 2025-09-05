@@ -1,13 +1,15 @@
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTheme } from '@/contexts/ThemeContext';
 import DatabaseService, { Message } from '@/services/DatabaseService';
 import MessagingService, { MessageEventData } from '@/services/MessagingService';
 import QRCodeService from '@/services/QRCodeService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Animated,
     FlatList,
     KeyboardAvoidingView,
     Modal,
@@ -17,6 +19,7 @@ import {
     TextInput,
     ToastAndroid,
     TouchableOpacity,
+    Vibration,
     View
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
@@ -24,22 +27,29 @@ import QRCode from 'react-native-qrcode-svg';
 interface ChatInterfaceProps {
   sessionId: string;
   onDisconnect: () => void;
+  onBack: () => void;
 }
 
-export default function ChatInterface({ sessionId, onDisconnect }: ChatInterfaceProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+export default function ChatInterface({ sessionId, onDisconnect, onBack }: ChatInterfaceProps) {
+  const { theme } = useTheme();
+  const colors = Colors[theme];
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [peerDisconnected, setPeerDisconnected] = useState(false);
+  const [sessionEnded, setSessionEnded] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrValue, setQrValue] = useState('');
   const [hostName, setHostName] = useState('');
   const [participantName, setParticipantName] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
+  
+  // Animation values for visual feedback
+  const sendButtonScale = useRef(new Animated.Value(1)).current;
+  const messageBubbleScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     initializeChat();
@@ -70,10 +80,21 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
   const initializeChat = async () => {
     try {
       setIsLoading(true);
+      setPeerDisconnected(false);
+      setSessionEnded(false);
       
       // Load existing messages from database
       const existingMessages = await DatabaseService.getMessages(sessionId);
       setMessages(existingMessages);
+
+      // If a system disconnect already occurred earlier, keep UI disabled
+      try {
+        const flag = await AsyncStorage.getItem(`sessionEnded:${sessionId}`);
+        if (flag === '1') {
+          setPeerDisconnected(true);
+          setSessionEnded(true);
+        }
+      } catch {}
       
       // Check if messaging service is connected
       setIsConnected(MessagingService.isConnected());
@@ -85,9 +106,23 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
       try {
         const sessions = await DatabaseService.getChatSessions();
         const s = sessions.find(ss => ss.sessionId === sessionId);
-        if (s) setParticipantName(s.participantName || null);
+        if (s) {
+          setParticipantName(s.participantName || null);
+        } else {
+          // If no session found, create one with current user's name
+          const currentUserName = MessagingService.getCurrentUserName();
+          if (currentUserName) {
+            await DatabaseService.saveChatSession({
+              sessionId,
+              participantName: currentUserName,
+              createdAt: Date.now(),
+              lastMessageAt: Date.now(),
+            });
+            setParticipantName(currentUserName);
+          }
+        }
       } catch (e) {
-        // ignore
+        console.warn('Error loading/saving session info:', e);
       }
       
       // Scroll to bottom
@@ -121,83 +156,119 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
     }
   };
 
-  const handleIncomingMessage = async (messageData: MessageEventData) => {
-    try {
-      const isOwnMessage = messageData.sender === MessagingService.getCurrentUserName();
-      
-      const message: Message = {
-        sessionId: messageData.sessionId,
-        sender: messageData.sender,
-        content: messageData.content,
-        timestamp: messageData.timestamp,
-        isOwn: isOwnMessage
-      };
+  const handleIncomingMessage = (messageData: MessageEventData) => {
+    if (messageData.sessionId === sessionId) {
+      // Ignore echoes of our own messages (e.g., from Firebase listeners)
+      const currentUser = MessagingService.getCurrentUserName();
+      if (currentUser && messageData.sender === currentUser) {
+        return;
+      }
 
-      // Save to database
-      await DatabaseService.saveMessage(message);
-      
-      // Update local state
-      setMessages(prev => [...prev, message]);
-      
-      // Update session timestamp
-      await DatabaseService.updateSessionLastMessage(sessionId, messageData.timestamp);
-
-      // If this is the first non-own message, update session participant name to the sender
-      if (!isOwnMessage) {
-        try {
-          await DatabaseService.saveChatSession({
-            sessionId,
-            participantName: messageData.sender,
-            createdAt: Date.now(),
-            lastMessageAt: messageData.timestamp,
-          });
-          setParticipantName(messageData.sender);
-        } catch (e) {
-          // ignore minor errors
+      // Handle system events
+      if (messageData.type === 'system') {
+        if (messageData.event === 'disconnected') {
+          setPeerDisconnected(true);
+          setSessionEnded(true);
+          // Persist flag locally so it remains across navigations
+          AsyncStorage.setItem(`sessionEnded:${sessionId}`, '1').catch(() => {});
+        } else if (messageData.event === 'joined') {
+          if (messageData.sender && messageData.sender !== 'system') {
+            setParticipantName(messageData.sender);
+            DatabaseService.updateSessionParticipantName(sessionId, messageData.sender).catch(() => {});
+          }
         }
       }
+
+      // If name missing or still placeholder, set it from first real incoming message
+      if ((!participantName || participantName === 'Unknown') && messageData.sender && messageData.type !== 'system' && messageData.sender !== 'system') {
+        setParticipantName(messageData.sender);
+        DatabaseService.updateSessionParticipantName(sessionId, messageData.sender).catch(() => {});
+      }
+      const newMessage: Message = {
+        sessionId,
+        content: messageData.content,
+        sender: messageData.sender,
+        timestamp: messageData.timestamp,
+        isOwn: false,
+      };
+      
+      setMessages(prev => [...prev, newMessage]);
       
       // Scroll to bottom
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
-
-      // Show notification for incoming messages (not own)
-      if (!isOwnMessage) {
-        showToast(`New message from ${messageData.sender}`);
-      }
-      
-    } catch (error) {
-      console.error('Error handling incoming message:', error);
     }
   };
 
   const sendMessage = async () => {
-    const messageText = inputText.trim();
-    if (!messageText) return;
-
-    if (!isConnected) {
-      Alert.alert('Not Connected', 'Please check your connection and try again.');
+    if (!inputText.trim() || isSending) return;
+    if (peerDisconnected) {
+      Alert.alert('Partner disconnected', 'You cannot send messages anymore in this session.');
+      return;
+    }
+    if (!MessagingService.isConnected()) {
+      Alert.alert('Not connected', 'Please wait until the chat connects.');
       return;
     }
 
+    // Visual feedback: button press animation
+    Animated.sequence([
+      Animated.timing(sendButtonScale, {
+        toValue: 0.9,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(sendButtonScale, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Haptic feedback
+    if (Platform.OS === 'ios') {
+      Vibration.vibrate(50);
+    }
+    
+    const messageText = inputText.trim();
+    setInputText('');
     setIsSending(true);
+    
     try {
-      // Clear input immediately for better UX
-      setInputText('');
+      // Create message object
+      const currentUserName = MessagingService.getCurrentUserName() || 'me';
+      const message: Message = {
+        sessionId,
+        content: messageText,
+        sender: currentUserName,
+        timestamp: Date.now(),
+        isOwn: true,
+      };
       
-      // Send message through messaging service
-      const success = await MessagingService.sendMessage(messageText);
+      // Add to local state immediately
+      setMessages(prev => [...prev, message]);
       
-      if (!success) {
-        throw new Error('Failed to send message');
-      }
+      // Save to database
+      await DatabaseService.saveMessage(message);
+      
+      // Update session last message time
+      await DatabaseService.updateSessionLastMessage(sessionId, Date.now());
+      
+      // Send via messaging service
+      await MessagingService.sendMessage(messageText);
+      
+      // Scroll to bottom
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
       
     } catch (error) {
       console.error('Error sending message:', error);
-      // Restore input text on error
-      setInputText(messageText);
-      Alert.alert('Error', 'Failed to send message. Please try again.');
+      Alert.alert('Error', 'Failed to send message');
+      
+      // Remove from local state if failed
+      setMessages(prev => prev.filter(m => m.timestamp !== Date.now()));
     } finally {
       setIsSending(false);
     }
@@ -236,46 +307,70 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
   };
 
   const renderMessage = ({ item }: { item: Message }) => (
-    <View style={[
-      styles.messageContainer,
-      item.isOwn ? styles.ownMessage : styles.otherMessage
-    ]}>
-      <View style={[
-        styles.messageBubble,
-        item.isOwn ? styles.ownMessageBubble : styles.otherMessageBubble,
+    <Animated.View 
+      style={[
+        styles.messageContainer,
+        item.isOwn ? styles.ownMessage : styles.otherMessage,
         {
-          backgroundColor: item.isOwn ? colors.myMessage : colors.otherMessage,
-          borderColor: colors.borderColor
+          transform: [{ scale: messageBubbleScale }]
         }
-      ]}>
-        {!item.isOwn && (
-          <Text style={[styles.senderName, { color: colors.text }]}>
-            {item.sender}
-          </Text>
-        )}
-        <Text style={[
-          styles.messageText,
-          { color: item.isOwn ? (Colors[colorScheme ?? 'light'].myMessageText) : (Colors[colorScheme ?? 'light'].otherMessageText || colors.text) }
-        ]}>
+      ]}
+    >
+      {!item.isOwn && participantName && (
+        <Text 
+          style={[styles.senderName, { color: colors.text }]}
+        >
+          {participantName}
+        </Text>
+      )}
+      
+      <View
+        style={[
+          styles.messageBubble,
+          item.isOwn ? styles.ownMessageBubble : styles.otherMessageBubble,
+          {
+            backgroundColor: item.isOwn ? colors.myMessage : colors.otherMessage,
+            borderColor: item.isOwn ? colors.myMessage : colors.borderColor,
+          }
+        ]}
+      >
+        <Text
+          style={[
+            styles.messageText,
+            {
+              color: item.isOwn ? colors.myMessageText : colors.otherMessageText,
+            }
+          ]}
+        >
           {item.content}
         </Text>
-        <Text style={[
-          styles.messageTime,
-          { color: item.isOwn ? Colors[colorScheme ?? 'light'].myMessageText : (colors.text + '80') }
-        ]}>
+        
+        <Text
+          style={[
+            styles.messageTime,
+            {
+              color: item.isOwn ? colors.myMessageText + '80' : colors.otherMessageText + '80',
+            }
+          ]}
+        >
           {formatTime(item.timestamp)}
         </Text>
       </View>
-    </View>
+    </Animated.View>
   );
 
   if (isLoading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.tint} />
-        <Text style={[styles.loadingText, { color: colors.text }]}>
-          Loading chat...
-        </Text>
+        <View style={styles.loadingContent}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.text }]}>
+            Loading chat...
+          </Text>
+          <Text style={[styles.loadingSubtext, { color: colors.placeholderText }]}>
+            Connecting to your conversation
+          </Text>
+        </View>
       </View>
     );
   }
@@ -287,45 +382,59 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
     >
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.borderColor }]}>
-        <View>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Chat Session</Text>
-          {participantName ? (
-            <Text style={[styles.headerSubtitle, { color: colors.placeholderText }]}>{participantName}</Text>
-          ) : (
-            <Text style={[styles.headerSubtitle, { color: colors.placeholderText }]}>Waiting for participant</Text>
-          )}
-        </View>
-        <View style={styles.headerRight}>
+        <View style={styles.headerLeftRow}>
           <TouchableOpacity 
-            onPress={() => setShowQRModal(true)}
-            style={styles.qrButton}
+            onPress={onBack}
+            style={[
+              styles.backPill,
+              { borderColor: colors.borderColor, backgroundColor: colors.cardBackground }
+            ]}
+            activeOpacity={0.8}
           >
-            <IconSymbol 
-              name="qrcode" 
-              size={24} 
-              color={colors.primary} 
-            />
+            <Text style={[styles.backPillText, { color: colors.text }]}>Back</Text>
           </TouchableOpacity>
-          <View style={[
-            styles.connectionIndicator,
-            { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }
-          ]} />
-          <TouchableOpacity onPress={handleDisconnect}>
-            <IconSymbol 
-              name="xmark.circle.fill" 
-              size={24} 
-              color={colors.text} 
-            />
+          <TouchableOpacity 
+            onPress={handleDisconnect}
+            disabled={!isConnected || peerDisconnected || sessionEnded}
+            style={[
+              styles.backPill,
+              { 
+                borderColor: colors.borderColor, 
+                backgroundColor: colors.cardBackground,
+                opacity: (!isConnected || peerDisconnected || sessionEnded) ? 0.5 : 1,
+              }
+            ]}
+            activeOpacity={0.8}
+          >
+            <IconSymbol name="xmark" size={20} color={colors.text} />
+            <Text style={[styles.backPillText, { color: colors.text }]}>
+              {peerDisconnected || sessionEnded ? 'Disconnected' : 'Disconnect'}
+            </Text>
           </TouchableOpacity>
         </View>
+        <View style={styles.headerCenter}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            {participantName && participantName !== 'Unknown' ? participantName : 'Chat Session'}
+          </Text>
+        </View>
+        {/* Removed QR button */}
       </View>
+
+      {/* Peer status banner */}
+      {peerDisconnected && (
+        <View style={[styles.peerBanner, { backgroundColor: colors.cardBackground, borderColor: colors.borderColor }]}> 
+          <Text style={{ color: colors.text }}>
+            Your chat partner has disconnected. You can no longer send messages.
+          </Text>
+        </View>
+      )}
 
       {/* Messages List */}
       <FlatList
         ref={flatListRef}
         data={messages}
         renderItem={renderMessage}
-        keyExtractor={(item, index) => item.id?.toString() || index.toString()}
+        keyExtractor={(item, index) => `${item.sessionId}-${item.timestamp}-${item.isOwn ? 'me' : item.sender}-${item.id ?? index}`}
         style={styles.messagesList}
         contentContainerStyle={styles.messagesContent}
         onContentSizeChange={() => {
@@ -333,9 +442,20 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
         }}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={[styles.emptyText, { color: colors.text }]}>
-              No messages yet. Start the conversation!
-            </Text>
+            <View style={styles.emptyContent}>
+              <IconSymbol 
+                name="message.circle" 
+                size={80} 
+                color={colors.placeholderText} 
+                style={styles.emptyIcon}
+              />
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                Start the Conversation!
+              </Text>
+              <Text style={[styles.emptyText, { color: colors.placeholderText }]}>
+                Send your first message to begin chatting with {participantName || 'your partner'}
+              </Text>
+            </View>
           </View>
         }
       />
@@ -365,11 +485,12 @@ export default function ChatInterface({ sessionId, onDisconnect }: ChatInterface
             styles.sendButton,
             { 
               backgroundColor: colors.primary,
-              opacity: (!inputText.trim() || isSending) ? 0.6 : 1
+              opacity: (!inputText.trim() || isSending || peerDisconnected) ? 0.4 : 1,
+              transform: [{ scale: sendButtonScale }]
             }
           ]}
           onPress={sendMessage}
-          disabled={!inputText.trim() || isSending}
+          disabled={!inputText.trim() || isSending || peerDisconnected}
         >
           {isSending ? (
             <ActivityIndicator size="small" color="white" />
@@ -424,9 +545,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loadingContent: {
+    alignItems: 'center',
+    padding: 20,
+  },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
+  },
+  loadingSubtext: {
+    marginTop: 4,
+    fontSize: 14,
   },
   header: {
     flexDirection: 'row',
@@ -434,6 +563,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
+  },
+  backPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderRadius: 999,
+  },
+  backPillText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  headerCenter: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  connectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
   },
   headerTitle: {
     fontSize: 18,
@@ -448,14 +600,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  headerLeftRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   qrButton: {
     padding: 4,
   },
-  connectionIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
+  // removed connectionIndicator styles
   messagesList: {
     flex: 1,
   },
@@ -468,10 +621,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 50,
   },
+  emptyContent: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyIcon: {
+    marginBottom: 15,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
   emptyText: {
     fontSize: 16,
     textAlign: 'center',
-    opacity: 0.6,
+    lineHeight: 22,
   },
   messageContainer: {
     marginVertical: 4,
@@ -612,5 +777,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     opacity: 0.7,
+  },
+  peerBanner: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
   },
 });

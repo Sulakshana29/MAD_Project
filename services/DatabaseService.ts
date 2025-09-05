@@ -19,52 +19,94 @@ export interface ChatSession {
   lastMessageAt: number;
 }
 
+/**
+ * DatabaseService - Handles local data persistence using SQLite (mobile) or AsyncStorage (web)
+ * 
+ * This service provides:
+ * - Message storage and retrieval
+ * - Chat session management
+ * - Cross-platform database abstraction
+ * - Automatic initialization and connection management
+ */
 class DatabaseService {
   private db: SQLite.SQLiteDatabase | null = null;
   private isWeb = Platform.OS === 'web';
+  private isInitializedFlag: boolean = false;
+  private initializePromise: Promise<void> | null = null;
 
+  /**
+   * Initializes the database and creates necessary tables
+   * Uses singleton pattern to prevent multiple initializations
+   */
   async initialize() {
     try {
-      if (this.isWeb) {
-        // Use AsyncStorage-based service for web
-        await WebDatabaseService.initialize();
-        console.log('Web Database (AsyncStorage) initialized successfully');
-        return;
-      }
+      if (this.isInitializedFlag && (this.isWeb || this.db)) return;
+      if (this.initializePromise) return this.initializePromise;
+      this.initializePromise = (async () => {
+        if (this.isWeb) {
+          // Use AsyncStorage-based service for web compatibility
+          await WebDatabaseService.initialize();
+          console.log('Web Database (AsyncStorage) initialized successfully');
+          this.isInitializedFlag = true;
+          return;
+        }
 
-      // Use SQLite for mobile platforms
-      this.db = await SQLite.openDatabaseAsync('instantchat.db');
-      
-      await this.db.execAsync(`
-        CREATE TABLE IF NOT EXISTS chat_sessions (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          sessionId TEXT UNIQUE NOT NULL,
-          participantName TEXT NOT NULL,
-          createdAt INTEGER NOT NULL,
-          lastMessageAt INTEGER NOT NULL
-        );
-      `);
+        // Use SQLite for mobile platforms with better performance
+        this.db = await SQLite.openDatabaseAsync('instantchat.db');
+        
+        // Create chat sessions table for session management
+        await this.db.execAsync(`
+          CREATE TABLE IF NOT EXISTS chat_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sessionId TEXT UNIQUE NOT NULL,
+            participantName TEXT NOT NULL,
+            createdAt INTEGER NOT NULL,
+            lastMessageAt INTEGER NOT NULL
+          );
+        `);
 
-      await this.db.execAsync(`
-        CREATE TABLE IF NOT EXISTS messages (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          sessionId TEXT NOT NULL,
-          sender TEXT NOT NULL,
-          content TEXT NOT NULL,
-          timestamp INTEGER NOT NULL,
-          isOwn INTEGER NOT NULL,
-          FOREIGN KEY (sessionId) REFERENCES chat_sessions (sessionId)
-        );
-      `);
+        // Create messages table with foreign key relationship
+        await this.db.execAsync(`
+          CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sessionId TEXT NOT NULL,
+            sender TEXT NOT NULL,
+            content TEXT NOT NULL,
+            timestamp INTEGER NOT NULL,
+            isOwn INTEGER NOT NULL,
+            FOREIGN KEY (sessionId) REFERENCES chat_sessions (sessionId)
+          );
+        `);
 
-      console.log('SQLite Database initialized successfully');
+        console.log('SQLite Database initialized successfully');
+        this.isInitializedFlag = true;
+      })();
+      await this.initializePromise;
+      this.initializePromise = null;
     } catch (error) {
       console.error('Database initialization error:', error);
+      this.initializePromise = null;
       throw error;
     }
   }
 
+  /**
+   * Ensures database is initialized before any operation
+   * Prevents race conditions during app startup
+   */
+  private async ensureInitialized() {
+    if (!this.isInitializedFlag) {
+      await this.initialize();
+    }
+  }
+
+  /**
+   * Saves a message to the local database
+   * @param message - The message object to save
+   * @returns Promise<number> - The ID of the saved message
+   */
   async saveMessage(message: Message): Promise<number> {
+    await this.ensureInitialized();
     if (this.isWeb) {
       return await WebDatabaseService.saveMessage(message);
     }
@@ -83,7 +125,13 @@ class DatabaseService {
     }
   }
 
+  /**
+   * Retrieves all messages for a specific chat session
+   * @param sessionId - The session ID to get messages for
+   * @returns Promise<Message[]> - Array of messages in chronological order
+   */
   async getMessages(sessionId: string): Promise<Message[]> {
+    await this.ensureInitialized();
     if (this.isWeb) {
       return await WebDatabaseService.getMessages(sessionId);
     }
@@ -111,6 +159,7 @@ class DatabaseService {
   }
 
   async saveChatSession(session: ChatSession): Promise<void> {
+    await this.ensureInitialized();
     if (this.isWeb) {
       return await WebDatabaseService.saveChatSession(session);
     }
@@ -129,6 +178,7 @@ class DatabaseService {
   }
 
   async getChatSessions(): Promise<ChatSession[]> {
+    await this.ensureInitialized();
     if (this.isWeb) {
       return await WebDatabaseService.getChatSessions();
     }
@@ -154,6 +204,7 @@ class DatabaseService {
   }
 
   async updateSessionLastMessage(sessionId: string, timestamp: number): Promise<void> {
+    await this.ensureInitialized();
     if (this.isWeb) {
       return await WebDatabaseService.updateSessionLastMessage(sessionId, timestamp);
     }
@@ -171,7 +222,27 @@ class DatabaseService {
     }
   }
 
+  async updateSessionParticipantName(sessionId: string, participantName: string): Promise<void> {
+    await this.ensureInitialized();
+    if (this.isWeb) {
+      return await WebDatabaseService.updateSessionParticipantName(sessionId, participantName);
+    }
+
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      await this.db.runAsync(
+        'UPDATE chat_sessions SET participantName = ? WHERE sessionId = ?',
+        [participantName, sessionId]
+      );
+    } catch (error) {
+      console.error('Error updating participant name:', error);
+      throw error;
+    }
+  }
+
   async deleteChatSession(sessionId: string): Promise<void> {
+    await this.ensureInitialized();
     if (this.isWeb) {
       return await WebDatabaseService.deleteChatSession(sessionId);
     }
