@@ -31,7 +31,8 @@
       "edgeToEdgeEnabled": true,
       "permissions": [
         "CAMERA",
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ],
       "package": "com.anonymous.instantchat"
     },
@@ -76,6 +77,10 @@
         "messagingSenderId": "456711816204",
         "appId": "1:456711816204:web:ba39516bb65d404e455a29",
         "measurementId": "G-EPRVJ2KXRC"
+      },
+      "router": {},
+      "eas": {
+        "projectId": "2e8248e7-ff18-4548-8c95-28ab82592e2b"
       }
     }
   }
